@@ -94,13 +94,22 @@ def mostrar_dashboard():
 
                 # Métricas principales en cards
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("💰 Ingresos", f"{datos_mes['total_ingresos']:.2f} €")
-                col2.metric("💸 Gastos", f"{abs(datos_mes['total_gastos']):.2f} €")
+                col1.metric(
+                    "💰 Ingresos",
+                    f"{datos_mes['total_ingresos']:.2f} €",
+                    help="Suma de todos los ingresos del mes seleccionado"
+                )
+                col2.metric(
+                    "💸 Gastos",
+                    f"{abs(datos_mes['total_gastos']):.2f} €",
+                    help="Suma total de todos los gastos del mes (en valor absoluto)"
+                )
                 col3.metric(
                     "⚖️ Balance",
                     f"{datos_mes['balance_neto']:.2f} €",
                     delta=f"{datos_mes['balance_neto']:.2f} €",
-                    delta_color="normal" if datos_mes['balance_neto'] > 0 else "inverse"
+                    delta_color="normal" if datos_mes['balance_neto'] > 0 else "inverse",
+                    help="Diferencia entre ingresos y gastos (Ingresos - Gastos). Positivo = superávit, Negativo = déficit"
                 )
 
                 # Tasa de ahorro rápida
@@ -108,7 +117,8 @@ def mostrar_dashboard():
                 col4.metric(
                     "💾 Tasa Ahorro",
                     f"{tasa['tasa_ahorro']:.1f}%",
-                    delta=f"{tasa['ahorro_absoluto']:.0f} €"
+                    delta=f"{tasa['ahorro_absoluto']:.0f} €",
+                    help="Porcentaje de tus ingresos que has logrado ahorrar. Ideal: >20%. Te ayuda a medir tu capacidad de ahorro"
                 )
 
                 st.markdown("---")
@@ -143,6 +153,114 @@ def mostrar_dashboard():
                             use_container_width=True
                         )
 
+                st.markdown("---")
+
+                # Gráfico de evolución del saldo disponible
+                st.markdown("### 📈 Evolución del Saldo Disponible")
+                transacciones = db_manager.obtener_transacciones(mes=mes, año=año)
+
+                if transacciones:
+                    df_trans = pd.DataFrame(transacciones)
+                    df_trans['fecha'] = pd.to_datetime(df_trans['fecha'])
+                    df_trans = df_trans.sort_values('fecha')
+
+                    # Calcular el saldo inicial del mes:
+                    # Líquido disponible total MENOS las transacciones del mes actual
+                    liquido_total = metrics.calcular_liquido_disponible()
+                    importe_mes_actual = df_trans['importe'].sum()
+                    saldo_inicial = liquido_total - importe_mes_actual
+
+                    # Añadir punto inicial del mes (saldo al cierre del mes anterior)
+                    fecha_inicial = df_trans['fecha'].min() - pd.Timedelta(days=1)
+                    df_inicial = pd.DataFrame([{
+                        'fecha': fecha_inicial,
+                        'importe': 0,
+                        'saldo_disponible': saldo_inicial
+                    }])
+
+                    # Combinar con las transacciones del mes
+                    df_trans['saldo_disponible'] = saldo_inicial + df_trans['importe'].cumsum()
+                    df_completo = pd.concat([df_inicial, df_trans[['fecha', 'saldo_disponible']]], ignore_index=True)
+
+                    # Crear gráfico de línea
+                    import plotly.graph_objects as go
+
+                    fig = go.Figure()
+
+                    # Preparar etiquetas de fecha para el eje X
+                    df_completo['fecha_str'] = df_completo['fecha'].dt.strftime('%d/%m/%Y')
+
+                    # Línea de evolución del saldo (usando índices para equidistancia)
+                    fig.add_trace(go.Scatter(
+                        x=df_completo['fecha_str'],
+                        y=df_completo['saldo_disponible'],
+                        mode='lines+markers',
+                        name='Saldo',
+                        line=dict(color='#1f77b4', width=2.5),
+                        marker=dict(
+                            size=8,
+                            color=df_completo['saldo_disponible'],
+                            colorscale=[[0, '#ef5350'], [0.5, '#ff9800'], [1, '#26a69a']],
+                            showscale=False,
+                            line=dict(width=1, color='white')
+                        ),
+                        fill='tonexty',
+                        fillcolor='rgba(31, 119, 180, 0.1)',
+                        hovertemplate='<b>%{x}</b><br>Saldo: %{y:.2f} €<extra></extra>'
+                    ))
+
+                    # Línea de referencia en y=0
+                    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5,
+                                 annotation_text="Break Even", annotation_position="right")
+
+                    # Línea de saldo inicial
+                    fig.add_hline(y=saldo_inicial, line_dash="dot", line_color="blue", opacity=0.3,
+                                 annotation_text=f"Inicial: {saldo_inicial:.0f}€",
+                                 annotation_position="left")
+
+                    fig.update_layout(
+                        title=f"Evolución del Saldo - {nombre_mes_seleccionado} {año}",
+                        xaxis_title="Fecha",
+                        yaxis_title="Saldo Disponible (€)",
+                        hovermode='closest',
+                        height=450,
+                        showlegend=False,
+                        xaxis=dict(
+                            tickangle=-45,
+                            tickmode='auto',
+                            nticks=20
+                        )
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Estadísticas del mes
+                    col1, col2, col3, col4 = st.columns(4)
+                    num_transacciones = len(df_trans)
+                    col1.metric(
+                        "📊 Transacciones",
+                        num_transacciones,
+                        help="Número total de transacciones registradas en el mes"
+                    )
+                    col2.metric(
+                        "📈 Saldo Inicial",
+                        f"{saldo_inicial:.2f} €",
+                        help="Saldo disponible al inicio del mes (cierre del mes anterior)"
+                    )
+                    col3.metric(
+                        "💰 Saldo Final",
+                        f"{df_trans['saldo_disponible'].iloc[-1]:.2f} €",
+                        delta=f"{df_trans['saldo_disponible'].iloc[-1] - saldo_inicial:.2f} €",
+                        help="Saldo disponible al final del mes con la variación respecto al inicio"
+                    )
+                    col4.metric(
+                        "📊 Variación (Max-Min)",
+                        f"{df_trans['saldo_disponible'].max() - df_trans['saldo_disponible'].min():.2f} €",
+                        help="Diferencia entre el saldo máximo y mínimo alcanzado durante el mes"
+                    )
+                else:
+                    st.info("No hay transacciones registradas en este mes")
+
         with subtab_año:
             with st.spinner("Calculando métricas anuales..."):
                 datos_anuales = metrics.calcular_totales_anual(año)
@@ -150,12 +268,21 @@ def mostrar_dashboard():
                 if datos_anuales:
                     # Métricas anuales
                     col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("💰 Ingresos Anuales", f"{datos_anuales['total_ingresos']:.2f} €")
-                    col2.metric("💸 Gastos Anuales", f"{abs(datos_anuales['total_gastos']):.2f} €")
+                    col1.metric(
+                        "💰 Ingresos Anuales",
+                        f"{datos_anuales['total_ingresos']:.2f} €",
+                        help="Suma total de ingresos en todos los meses del año"
+                    )
+                    col2.metric(
+                        "💸 Gastos Anuales",
+                        f"{abs(datos_anuales['total_gastos']):.2f} €",
+                        help="Suma total de gastos en todos los meses del año"
+                    )
                     col3.metric(
                         "⚖️ Balance Anual",
                         f"{datos_anuales['balance_neto']:.2f} €",
-                        delta_color="normal" if datos_anuales['balance_neto'] > 0 else "inverse"
+                        delta_color="normal" if datos_anuales['balance_neto'] > 0 else "inverse",
+                        help="Balance neto del año completo (Total Ingresos - Total Gastos)"
                     )
 
                     # Ahorro anual
@@ -164,7 +291,11 @@ def mostrar_dashboard():
                         tasa_anual = (ahorro_anual / datos_anuales['total_ingresos']) * 100
                     else:
                         tasa_anual = 0
-                    col4.metric("💾 Tasa Ahorro Anual", f"{tasa_anual:.1f}%")
+                    col4.metric(
+                        "💾 Tasa Ahorro Anual",
+                        f"{tasa_anual:.1f}%",
+                        help="Porcentaje de ahorro sobre el total de ingresos del año. Mide tu capacidad de ahorro anual"
+                    )
 
                     st.markdown("---")
 
@@ -224,21 +355,24 @@ def mostrar_dashboard():
                     col1.metric(
                         "Tasa de Ahorro",
                         f"{tasa_ahorro['tasa_ahorro']:.1f}%",
-                        delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €"
+                        delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €",
+                        help="% de tus ingresos que lograste ahorrar. Ideal >20%. Útil para evaluar tu disciplina financiera"
                     )
 
                     gasto_diario = metrics.calcular_gasto_promedio_diario(mes, año)
                     col2.metric(
                         "Gasto Promedio/Día",
                         f"{gasto_diario['promedio_diario']:.2f} €",
-                        delta=f"Proyección mes: {gasto_diario['proyeccion_mes']:.0f} €"
+                        delta=f"Proyección mes: {gasto_diario['proyeccion_mes']:.0f} €",
+                        help="Cuánto gastas en promedio cada día. Te ayuda a controlar tus gastos diarios y proyectar el total del mes"
                     )
 
                     proyeccion = metrics.calcular_proyeccion_balance(3)
                     col3.metric(
                         "Balance en 3 Meses",
                         f"{proyeccion['balance_proyectado']:.0f} €",
-                        delta=f"Confianza: {proyeccion['confianza']}"
+                        delta=f"Confianza: {proyeccion['confianza']}",
+                        help="Proyección de tu balance en 3 meses basado en tu comportamiento histórico. Útil para planificar gastos futuros"
                     )
 
                 with st.expander("📊 Efficiency Ratios"):
@@ -246,9 +380,24 @@ def mostrar_dashboard():
                     st.info(f"**{ratios['evaluacion']}**")
 
                     col1, col2, col3 = st.columns(3)
-                    col1.metric("FIJOS/Ingresos", f"{ratios.get('ratio_fijos', 0):.1f}%", delta="Ideal <30%")
-                    col2.metric("DISFRUTE/Ingresos", f"{ratios.get('ratio_disfrute', 0):.1f}%", delta="Ideal <30%")
-                    col3.metric("EXTRA/Ingresos", f"{ratios.get('ratio_extraordinarios', 0):.1f}%", delta="Ideal <10%")
+                    col1.metric(
+                        "FIJOS/Ingresos",
+                        f"{ratios.get('ratio_fijos', 0):.1f}%",
+                        delta="Ideal <30%",
+                        help="% de gastos fijos sobre tus ingresos. Ideal <30%. Mide qué porción de tus ingresos va a gastos obligatorios (vivienda, servicios, etc.)"
+                    )
+                    col2.metric(
+                        "DISFRUTE/Ingresos",
+                        f"{ratios.get('ratio_disfrute', 0):.1f}%",
+                        delta="Ideal <30%",
+                        help="% de gastos de disfrute sobre tus ingresos. Ideal <30%. Mide cuánto destinas a ocio, entretenimiento y placeres personales"
+                    )
+                    col3.metric(
+                        "EXTRA/Ingresos",
+                        f"{ratios.get('ratio_extraordinarios', 0):.1f}%",
+                        delta="Ideal <10%",
+                        help="% de gastos extraordinarios sobre tus ingresos. Ideal <10%. Gastos imprevistos o no recurrentes que afectan tu presupuesto"
+                    )
 
                 with st.expander("📉 Variación vs Mes Anterior"):
                     variacion = metrics.calcular_variacion_mensual(mes, año)
@@ -300,10 +449,26 @@ def mostrar_dashboard():
                     col1, col2, col3, col4 = st.columns(4)
                     desg = health['desglose']
 
-                    col1.metric("Ahorro", f"{desg['ahorro']}/30")
-                    col2.metric("Eficiencia", f"{desg['eficiencia_fijos']}/25")
-                    col3.metric("Estabilidad", f"{desg['estabilidad']}/25")
-                    col4.metric("Tendencia", f"{desg['tendencia']}/20")
+                    col1.metric(
+                        "Ahorro",
+                        f"{desg['ahorro']}/30",
+                        help="Puntos por tu capacidad de ahorro. Máximo 30pts. Basado en tu tasa de ahorro mensual"
+                    )
+                    col2.metric(
+                        "Eficiencia",
+                        f"{desg['eficiencia_fijos']}/25",
+                        help="Puntos por eficiencia en gastos fijos. Máximo 25pts. Cuanto menor sea tu ratio de gastos fijos, más puntos"
+                    )
+                    col3.metric(
+                        "Estabilidad",
+                        f"{desg['estabilidad']}/25",
+                        help="Puntos por estabilidad financiera. Máximo 25pts. Basado en tu balance positivo y consistencia"
+                    )
+                    col4.metric(
+                        "Tendencia",
+                        f"{desg['tendencia']}/20",
+                        help="Puntos por tendencia de mejora. Máximo 20pts. Si gastas menos que el mes anterior, ganas puntos"
+                    )
 
         # ANÁLISIS ANUAL
         with analisis_tabs[1]:
@@ -324,20 +489,23 @@ def mostrar_dashboard():
                 col1.metric(
                     "💰 Ahorro Anual Total",
                     f"{ahorro_anual:.2f} €",
-                    delta=f"Tasa: {tasa_ahorro_anual:.1f}%"
+                    delta=f"Tasa: {tasa_ahorro_anual:.1f}%",
+                    help="Total ahorrado en el año completo. La tasa muestra qué % de tus ingresos anuales has logrado ahorrar"
                 )
 
                 # Promedio mensual
                 promedio_gasto_mensual = gastos_anuales / 12
                 col2.metric(
                     "📊 Promedio Gasto/Mes",
-                    f"{promedio_gasto_mensual:.2f} €"
+                    f"{promedio_gasto_mensual:.2f} €",
+                    help="Gasto promedio mensual del año. Útil para establecer un presupuesto mensual realista"
                 )
 
                 promedio_ingreso_mensual = ingresos_anuales / 12
                 col3.metric(
                     "💵 Promedio Ingreso/Mes",
-                    f"{promedio_ingreso_mensual:.2f} €"
+                    f"{promedio_ingreso_mensual:.2f} €",
+                    help="Ingreso promedio mensual del año. Te ayuda a entender tu capacidad financiera mensual típica"
                 )
 
                 st.markdown("---")
