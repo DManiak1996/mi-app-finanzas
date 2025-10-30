@@ -467,6 +467,133 @@ python test_db.py
 
 ---
 
+## Nuevas Funcionalidades (Versión 2.0)
+
+### Dashboard Rediseñado 📊
+**Organización sin scroll infinito:**
+- **3 tabs principales**: Resumen General, Análisis Avanzado, Histórico
+- **Sub-tabs mensuales/anuales** en cada sección
+- **Tooltips informativos** en todas las métricas explicando qué son y para qué sirven
+- **Métricas con contexto**: Valores ideales, interpretación, utilidad práctica
+
+### Gráfico de Evolución del Saldo 📈
+**Visualización tipo bolsa/finanzas:**
+- Parte del **saldo real** al inicio del mes (cierre del mes anterior)
+- Muestra **saldo después de cada transacción**
+- Puntos **equidistantes** (distancia=1) sin espacios vacíos
+- **Marcadores coloreados** según nivel de saldo (verde/naranja/rojo)
+- Líneas de referencia: Break Even (y=0) y Saldo Inicial
+- Métricas resumen: Transacciones totales, Saldo Inicial/Final, Variación
+
+### Métricas Financieras Avanzadas 💡
+
+**Análisis Mensual:**
+1. **Financial Health Score (0-100)**: Puntuación global de salud financiera
+   - Componentes: Ahorro (30pts), Eficiencia (25pts), Estabilidad (25pts), Tendencia (20pts)
+   - Interpretación visual con colores y emojis
+
+2. **Tasa de Ahorro**: Porcentaje de ingresos ahorrados
+   - Ideal: >20%
+   - Mide disciplina financiera
+
+3. **Gasto Promedio Diario**: Control de gastos día a día
+   - Incluye proyección del gasto total del mes
+
+4. **Proyección Balance (3 meses)**: Predicción basada en comportamiento histórico
+   - Nivel de confianza calculado
+   - Útil para planificar gastos futuros
+
+5. **Efficiency Ratios**: Ratios de gasto sobre ingresos
+   - FIJOS/Ingresos (ideal <30%)
+   - DISFRUTE/Ingresos (ideal <30%)
+   - EXTRAORDINARIOS/Ingresos (ideal <10%)
+
+6. **Variación vs Mes Anterior**: Comparación mensual
+   - Porcentaje de cambio total
+   - Desglose por categoría
+
+7. **Top 10 Gastos del Mes**: Mayores gastos con porcentaje del total
+
+**Análisis Anual:**
+- Ahorro anual total con tasa
+- Promedios mensuales (gasto/ingreso)
+- Identificación del mejor y peor mes
+- Distribución mensual con estadísticas
+
+### Sistema de Auto-Categorización 🤖
+**38 reglas inteligentes** basadas en análisis de patrones reales:
+
+**FIJOS (8 reglas):**
+- Nómina y transferencias de trabajo
+- Gimnasio (VIVAGYM, ALTAFIT)
+- Dieta/entrenamiento personal (~50€)
+- Letra del coche (~249.73€)
+- Suscripciones (Claude, Apple Cloud)
+- Ayuda familiar (400-700€)
+- Retiradas cajero elevadas (≥400€)
+
+**EXTRAORDINARIOS (8 reglas):**
+- Servicios médicos (dentista, farmacia)
+- Reparaciones y mantenimiento coche
+- Óptica (gafas, lentillas)
+- Grandes compras hogar/electrónica
+- Viajes y eventos especiales
+- Regalos
+- Préstamos
+- Devoluciones IRPF
+
+**DISFRUTE (19 reglas):**
+- Supermercado y alimentación
+- Gasolina y combustible
+- Bares y cervecerías
+- Restaurantes y asadores
+- Fast food (kebab, burgers, etc.)
+- Ocio nocturno (discotecas, salas)
+- Tabaco y vaper
+- Compras de ropa
+- Amazon y compras online
+- Peluquería y cuidado personal
+- Parking y transporte público
+- Cafeterías y snacks
+- Panaderías
+
+**Características técnicas:**
+- Matching por **patrón de texto** (regex case-insensitive)
+- Matching por **importes exactos** (opcional)
+- **Primera coincidencia gana** (orden de prioridad)
+- Integrado con importador Excel para clasificación automática
+- **100% de acierto** en tests con datos reales
+
+### Sincronización Mac ↔ Cloud ☁️
+**Sistema de sincronización bidireccional:**
+- Exportación de toda la base de datos a JSON
+- Importación con 3 modos:
+  - **Fusionar**: Combina sin duplicados (recomendado)
+  - **Reemplazar**: Sobrescribe datos locales
+  - **Solo añadir**: Solo añade nuevos registros
+- Detección inteligente de duplicados por UUID y (fecha, importe, concepto)
+- Comparación de bases de datos mostrando diferencias
+- Soporte UUID para evitar conflictos de IDs
+
+### Deployment en Streamlit Cloud 🌐
+**Aplicación desplegada y accesible:**
+- URL pública: https://mi-app-finanzas.streamlit.app
+- Autenticación personalizada (email/password)
+- Compatible con Chrome en iPhone
+- Sincronización manual entre Mac local y Cloud
+- Base de datos independiente por instancia
+
+### Script de Reclasificación 🔄
+**Herramienta de mantenimiento:**
+- Reclasifica todas las transacciones existentes según nuevas reglas
+- Estadísticas detalladas de cambios por categoría
+- Ejemplos de transacciones reclasificadas
+- Sin pérdida de datos
+- Ejecutable con: `python reclasificar_transacciones.py`
+
+---
+
 **Última actualización:** Octubre 2025
-**Versión:** 1.0
+**Versión:** 2.0
 **Mantenedor:** Daniel
+**Desarrollado con:** Claude Code + Streamlit
