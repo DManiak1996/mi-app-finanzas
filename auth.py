@@ -1,32 +1,36 @@
 # auth.py - Sistema de autenticación para la app
 
 import streamlit as st
+import hashlib
+import time
 
 def check_authentication():
     """
-    Sistema de autenticación simple con Google.
-    Usa Streamlit secrets para almacenar emails autorizados.
+    Sistema de autenticación robusto con email y contraseña.
+    Usa Streamlit secrets para almacenar credenciales.
     """
 
     # Verificar si ya está autenticado
     if "authenticated" in st.session_state and st.session_state["authenticated"]:
         return True
 
-    # Obtener email autorizado de secrets
+    # Obtener credenciales de secrets
     try:
         authorized_email = st.secrets["auth"]["authorized_email"]
+        correct_password = st.secrets["auth"]["password"]
     except Exception:
         # Si no hay secrets configurados, mostrar instrucciones
         st.error("⚠️ Configuración de autenticación pendiente")
         st.info("""
         Para configurar la autenticación:
-        1. Ve a Streamlit Cloud
-        2. Settings > Secrets
-        3. Añade:
-        ```
+        1. Ve a Streamlit Cloud > Settings > Secrets
+        2. Añade:
+        ```toml
         [auth]
         authorized_email = "tu-email@gmail.com"
+        password = "tu-contraseña-segura"
         ```
+        3. Guarda y reinicia la app
         """)
         st.stop()
 
@@ -34,31 +38,41 @@ def check_authentication():
     st.title("🔐 Mi App de Finanzas")
     st.markdown("---")
 
-    # Usar el authenticator de Streamlit (simple)
     st.markdown("### Acceso Privado")
-    st.info("Esta aplicación requiere autenticación.")
+    st.info("Esta aplicación es de uso personal. Introduce tus credenciales para acceder.")
 
-    # Input de email simple
-    email_input = st.text_input("Introduce tu email:", key="email_input")
-    password_input = st.text_input("Introduce la contraseña:", type="password", key="password_input")
+    # Formulario de login
+    with st.form("login_form"):
+        email_input = st.text_input(
+            "Email:",
+            placeholder="tu-email@gmail.com",
+            key="email_input"
+        )
+        password_input = st.text_input(
+            "Contraseña:",
+            type="password",
+            placeholder="Tu contraseña",
+            key="password_input"
+        )
 
-    if st.button("🔑 Acceder"):
-        # Verificar email y password
-        try:
-            correct_password = st.secrets["auth"]["password"]
-        except Exception:
-            correct_password = "finanzas2024"  # Default para desarrollo local
+        submit_button = st.form_submit_button("🔑 Iniciar Sesión")
 
-        if email_input == authorized_email and password_input == correct_password:
-            st.session_state["authenticated"] = True
-            st.session_state["user_email"] = email_input
-            st.success("✅ Acceso concedido")
-            st.rerun()
-        else:
-            st.error("❌ Email o contraseña incorrectos")
+        if submit_button:
+            # Verificar credenciales
+            if email_input == authorized_email and password_input == correct_password:
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_input
+                st.session_state["login_time"] = time.time()
+                st.success("✅ Acceso concedido. Redirigiendo...")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("❌ Email o contraseña incorrectos")
+                time.sleep(1)
 
     st.markdown("---")
-    st.caption("🔒 Aplicación protegida con autenticación")
+    st.caption("🔒 Aplicación protegida • Solo acceso autorizado")
+    st.caption("💡 Tip: Guarda esta página en favoritos o añádela a tu pantalla de inicio")
 
     return False
 

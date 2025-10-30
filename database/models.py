@@ -4,7 +4,7 @@
 # Sentencia SQL para crear la tabla de transacciones
 CREATE_TRANSACTIONS_TABLE = """
 CREATE TABLE IF NOT EXISTS transacciones (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     fecha DATE NOT NULL,
     concepto TEXT NOT NULL,
     importe REAL NOT NULL,
@@ -13,7 +13,9 @@ CREATE TABLE IF NOT EXISTS transacciones (
     mes INTEGER,
     año INTEGER,
     notas TEXT,
-    saldo_posterior REAL
+    saldo_posterior REAL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
 

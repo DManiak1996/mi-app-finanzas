@@ -2,9 +2,14 @@
 # database/db_manager.py
 
 import sqlite3
+import uuid
 from .models import ALL_TABLES
 
 DB_NAME = 'finanzas.db'
+
+def generar_uuid():
+    """Genera un UUID único para usar como ID de transacción."""
+    return str(uuid.uuid4())
 
 def get_db_connection():
     """Establece la conexión con la base de datos."""
@@ -26,17 +31,21 @@ def crear_tablas():
     finally:
         conn.close()
 
-def insertar_transaccion(fecha, concepto, importe, categoria, tipo, mes, año, notas='', saldo_posterior=None):
+def insertar_transaccion(fecha, concepto, importe, categoria, tipo, mes, año, notas='', saldo_posterior=None, id=None):
     """Inserta una nueva transacción en la base de datos."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Generar UUID si no se proporciona (para sincronización)
+        if id is None:
+            id = generar_uuid()
+
         cursor.execute("""
-            INSERT INTO transacciones (fecha, concepto, importe, categoria, tipo, mes, año, notas, saldo_posterior)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (fecha, concepto, importe, categoria, tipo, mes, año, notas, saldo_posterior))
+            INSERT INTO transacciones (id, fecha, concepto, importe, categoria, tipo, mes, año, notas, saldo_posterior)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (id, fecha, concepto, importe, categoria, tipo, mes, año, notas, saldo_posterior))
         conn.commit()
-        return cursor.lastrowid
+        return id
     except sqlite3.Error as e:
         print(f"Error al insertar transacción: {e}")
         return None
