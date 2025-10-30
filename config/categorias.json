@@ -54,14 +54,25 @@
       "patron": "",
       "categoria": "FIJOS",
       "tipo": "GASTO",
-      "importes_exactos": [400.0, 500.0, 600.0, 700.0]
+      "importes_exactos": [
+        400.0,
+        500.0,
+        600.0,
+        700.0
+      ]
     },
     {
       "_descripcion": "FIJOS: Retiradas cajero elevadas (>=400€)",
       "patron": "RGRO\\.TJTA\\.CAJERO",
       "categoria": "FIJOS",
       "tipo": "GASTO",
-      "importes_exactos": [400.0, 500.0, 600.0, 700.0, 800.0]
+      "importes_exactos": [
+        400.0,
+        500.0,
+        600.0,
+        700.0,
+        800.0
+      ]
     },
     {
       "_descripcion": "EXTRAORDINARIOS: Préstamos",
