@@ -105,7 +105,7 @@ def leer_excel(file_path):
 
 
                 tipo = 'INGRESO' if importe > 0 else 'GASTO'
-                categoria = categorizer.clasificar_transaccion(concepto)
+                categoria = categorizer.clasificar_transaccion(concepto, importe)
 
                 transacciones.append({
                     'fecha': fecha,

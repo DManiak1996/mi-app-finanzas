@@ -1,49 +1,199 @@
 {
-  "_comentario": "Reglas para la clasificación automática de transacciones.",
+  "_comentario": "Reglas para la clasificación automática de transacciones. Las reglas se evalúan en orden, la primera coincidencia gana.",
   "reglas": [
     {
-      "patron": "RBO VIVAGYM",
-      "categoria": "FIJOS",
-      "tipo": "GASTO"
-    },
-    {
-      "patron": "NOMINA DE: FUNDACION MIGUEL SERVET",
+      "_descripcion": "INGRESOS: Nómina",
+      "patron": "NOMINA DE: FUNDACION MIGUEL SERVET|TRAF\\. DE: FUNDACION MIGUEL SERVET",
       "categoria": "FIJOS",
       "tipo": "INGRESO"
     },
     {
-      "patron": "APPLE.COM/BILL",
+      "_descripcion": "INGRESOS: Devolución IRPF",
+      "patron": "DEV\\. IRPF|DEVOLUCION IRPF",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "INGRESO"
+    },
+    {
+      "_descripcion": "INGRESOS: Bonificaciones bancarias",
+      "patron": "BONIF|BONIFICACION",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "INGRESO"
+    },
+    {
+      "_descripcion": "FIJOS: Gimnasio",
+      "patron": "RBO VIVAGYM|RBO ALTAFIT|VIVAGYM|ALTAFIT",
       "categoria": "FIJOS",
       "tipo": "GASTO"
     },
     {
-      "patron": " bofff|boffff|boooff",
+      "_descripcion": "FIJOS: Dieta/entrenamiento (50€ aprox)",
+      "patron": "bofff|boffff|boooff|booff|booof",
       "categoria": "FIJOS",
       "tipo": "GASTO"
     },
     {
-      "patron": "CLAUDE.AI SUBSCRIPTION",
+      "_descripcion": "FIJOS: Letra del coche (~249.73€)",
+      "patron": "PAGO VW ID\\.3|VW ID",
       "categoria": "FIJOS",
       "tipo": "GASTO"
     },
     {
-      "patron": "ARKUPE|arkupe",
-      "categoria": "DISFRUTE",
+      "_descripcion": "FIJOS: Suscripción Claude",
+      "patron": "CLAUDE|claude\\.ai",
+      "categoria": "FIJOS",
       "tipo": "GASTO"
     },
     {
-      "patron": "BAR ARKUPE",
-      "categoria": "DISFRUTE",
+      "_descripcion": "FIJOS: Apple Cloud",
+      "patron": "APPLE\\.COM/BILL",
+      "categoria": "FIJOS",
       "tipo": "GASTO"
     },
     {
+      "_descripcion": "FIJOS: Ayuda familiar (400-700€, normalmente 500€)",
       "patron": "",
       "categoria": "FIJOS",
       "tipo": "GASTO",
-      "importes_exactos": [
-        500.0,
-        275.0
-      ]
+      "importes_exactos": [400.0, 500.0, 600.0, 700.0]
+    },
+    {
+      "_descripcion": "FIJOS: Retiradas cajero elevadas (>=400€)",
+      "patron": "RGRO\\.TJTA\\.CAJERO",
+      "categoria": "FIJOS",
+      "tipo": "GASTO",
+      "importes_exactos": [400.0, 500.0, 600.0, 700.0, 800.0]
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Préstamos",
+      "patron": "Préstamo|prestamo|PRESTAMO",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Dentista",
+      "patron": "DENTISTA|CLI DENTAL|DENTAL",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Farmacia",
+      "patron": "FARMACIA",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Reparaciones coche",
+      "patron": "NORAUTO|revision|pinchazo|reparacion",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Óptica",
+      "patron": "gafas|optica|OPTICA",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Grandes compras hogar/electrónica",
+      "patron": "LEROY MERLIN|MEDIA MARK|IKEA",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Viajes/eventos",
+      "patron": "OF.*LONDON|ESHG CONFERENCES|bodorrio",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "EXTRAORDINARIOS: Regalos",
+      "patron": "regalo",
+      "categoria": "EXTRAORDINARIOS",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Supermercado/Alimentación",
+      "patron": "MERCADONA|EROSKI|CARREFOUR|LECLERC|ALIMENTACION|ALIMENTACI|DUDU",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Gasolina",
+      "patron": "gasolina|GASOLINA|ES ORCOYEN|ES PETRONALCA|GASOLINERA|pesau",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Bares",
+      "patron": "BAR |CERVECERIA|TABERNA|PLAZAOLA|ARKUPE|GURU|ESLAVA|ULZAMA|PTV|ANIMALS|CASINO ESLAVA",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Restaurantes",
+      "patron": "RESTAURANTE|ASADOR|GALARTZA|TAL CUAL|ASIA|ARAMENDIA|BOTANICO|CUATRO CANTONES|COMPA.IA DEL TRANVIA",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Fast food",
+      "patron": "KEBAB|GYRO|TACO BELL|BUTCHERS|HANAMI|VIVO BURGER|ESTAMBUL|RICO KEBAB",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Ocio nocturno",
+      "patron": "DISCOTECA|SALA INDARA|SALA SUITE|CANALLA|RKN-DISCO|indara|cubata",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Cafés/snacks/conceptos comida",
+      "patron": "comida|cena|pinchos|pintxo|desayuno|Almuercicooooo|cafee|cana|Cena|Comida",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Tabaco/vaper",
+      "patron": "ESTANCO|EXPENDEDURIA|vaper|vaps",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Compras ropa",
+      "patron": "ZARA|PULL & BEAR|PRIMARK",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Amazon/compras online",
+      "patron": "AMAZON|Amazon\\.es|WWW\\.AMAZON",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Peluquería",
+      "patron": "pelo|BARBERIA",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Parking",
+      "patron": "PARKIA",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Transporte público",
+      "patron": "TARJETABUS|ESTACION AUTOBUS|UTE ESTACION",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "_descripcion": "DISFRUTE: Panaderías",
+      "patron": "PANADERIA|ZABALETA|TAHONA",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
     }
   ]
 }
