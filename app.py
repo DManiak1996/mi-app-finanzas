@@ -2,7 +2,7 @@
 
 import streamlit as st
 from database import db_manager
-from utils import metrics, visualizer, excel_reader, categorizer
+from utils import metrics, visualizer, excel_reader, categorizer, sync
 import datetime
 import pandas as pd
 import json
@@ -31,7 +31,7 @@ inicializar_app()
 st.sidebar.title("Navegación")
 pagina_seleccionada = st.sidebar.radio(
     "Elige una página:",
-    ["Dashboard", "Transacciones", "Importar", "Categorías", "Configuración"]
+    ["Dashboard", "Transacciones", "Importar", "Categorías", "Sincronización", "Configuración"]
 )
 
 st.sidebar.markdown("---")
@@ -442,6 +442,184 @@ def mostrar_categorias():
             else:
                 st.warning("Debes proporcionar al menos un patrón de texto o uno o más importes exactos.")
 
+def mostrar_sincronizacion():
+    st.title("🔄 Sincronización")
+    st.markdown("Sincroniza tu base de datos entre diferentes dispositivos (Mac ↔ Cloud)")
+
+    st.markdown("---")
+
+    # Tabs para exportar e importar
+    tab_export, tab_import, tab_comparar = st.tabs(["📤 Exportar", "📥 Importar", "🔍 Comparar"])
+
+    with tab_export:
+        st.subheader("Exportar Base de Datos")
+        st.info("Descarga tu base de datos completa en formato JSON para importarla en otro dispositivo.")
+
+        # Mostrar estadísticas
+        transacciones = db_manager.obtener_transacciones()
+        col1, col2 = st.columns(2)
+        col1.metric("Total de Transacciones", len(transacciones))
+
+        if transacciones:
+            importes_totales = sum(t['importe'] for t in transacciones)
+            col2.metric("Balance Total", f"{importes_totales:.2f} €")
+
+        st.markdown("---")
+
+        if st.button("📥 Generar Archivo de Exportación", type="primary"):
+            with st.spinner("Generando archivo..."):
+                json_export = sync.generar_json_exportacion()
+
+                # Ofrecer descarga
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"finanzas_export_{timestamp}.json"
+
+                st.download_button(
+                    label="⬇️ Descargar Archivo JSON",
+                    data=json_export,
+                    file_name=filename,
+                    mime="application/json"
+                )
+
+                st.success(f"✅ Archivo generado: {len(transacciones)} transacciones")
+
+    with tab_import:
+        st.subheader("Importar Base de Datos")
+        st.info("Sube un archivo JSON exportado desde otro dispositivo para sincronizar datos.")
+
+        uploaded_file = st.file_uploader(
+            "Selecciona archivo JSON de exportación",
+            type=['json'],
+            key="sync_upload"
+        )
+
+        if uploaded_file is not None:
+            try:
+                # Leer y parsear el JSON
+                json_string = uploaded_file.read().decode('utf-8')
+                data_importar = sync.parsear_json_importacion(json_string)
+
+                # Mostrar preview
+                st.success("✅ Archivo válido cargado")
+
+                metadata = data_importar.get("metadata", {})
+                transacciones_importar = data_importar.get("transacciones", [])
+
+                st.write(f"**Exportado en:** {metadata.get('exported_at', 'N/A')}")
+                st.write(f"**Total transacciones:** {len(transacciones_importar)}")
+
+                # Comparar con DB actual
+                comparacion = sync.comparar_bases_datos(data_importar)
+
+                st.markdown("### 📊 Análisis de Diferencias")
+
+                col1, col2, col3 = st.columns(3)
+                col1.metric("En este dispositivo", comparacion['total_local'])
+                col2.metric("En el archivo", comparacion['total_remota'])
+                col3.metric("En ambos", comparacion['en_ambas'])
+
+                st.markdown("---")
+
+                # Mostrar transacciones nuevas
+                if comparacion['solo_en_remota']['count'] > 0:
+                    st.success(f"✨ **{comparacion['solo_en_remota']['count']} transacciones nuevas** encontradas en el archivo")
+
+                    with st.expander("Ver transacciones nuevas"):
+                        df_nuevas = pd.DataFrame(comparacion['solo_en_remota']['transacciones'])
+                        st.dataframe(df_nuevas[['fecha', 'concepto', 'importe', 'categoria']], use_container_width=True)
+                else:
+                    st.info("No hay transacciones nuevas en el archivo")
+
+                if comparacion['solo_en_local']['count'] > 0:
+                    st.warning(f"⚠️ **{comparacion['solo_en_local']['count']} transacciones** existen aquí pero no en el archivo")
+
+                st.markdown("---")
+
+                # Modo de importación
+                modo_import = st.radio(
+                    "Modo de importación:",
+                    ["Fusionar (Añadir solo nuevas)", "Sobrescribir (Reemplazar todo)"],
+                    help="Fusionar: Añade solo transacciones nuevas. Sobrescribir: Elimina todo y reemplaza (NO DISPONIBLE por seguridad)"
+                )
+
+                modo = "fusionar" if "Fusionar" in modo_import else "sobrescribir"
+
+                if modo == "sobrescribir":
+                    st.error("⚠️ Modo sobrescribir desactivado por seguridad. Usa 'Fusionar'.")
+                else:
+                    if st.button("🔄 Importar y Fusionar", type="primary", disabled=(comparacion['solo_en_remota']['count'] == 0)):
+                        with st.spinner("Importando transacciones..."):
+                            stats = sync.importar_base_datos(data_importar, modo=modo)
+
+                        st.success("✅ Importación completada")
+
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Nuevas", stats['nuevas'], delta=f"+{stats['nuevas']}")
+                        col2.metric("Duplicadas (omitidas)", stats['duplicadas'])
+                        col3.metric("Errores", stats['errores'], delta_color="inverse")
+
+                        if stats['nuevas'] > 0:
+                            st.balloons()
+
+                        st.info("💡 Refresca la página para ver los datos actualizados")
+
+            except Exception as e:
+                st.error(f"❌ Error al procesar el archivo: {e}")
+
+    with tab_comparar:
+        st.subheader("Comparar con Archivo")
+        st.info("Compara tu base de datos actual con un archivo exportado sin importar nada.")
+
+        uploaded_file_compare = st.file_uploader(
+            "Selecciona archivo JSON para comparar",
+            type=['json'],
+            key="sync_compare"
+        )
+
+        if uploaded_file_compare is not None:
+            try:
+                json_string = uploaded_file_compare.read().decode('utf-8')
+                data_comparar = sync.parsear_json_importacion(json_string)
+
+                comparacion = sync.comparar_bases_datos(data_comparar)
+
+                st.markdown("### 📊 Resultados de la Comparación")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.metric("Total en este dispositivo", comparacion['total_local'])
+                    st.metric("Solo en este dispositivo", comparacion['solo_en_local']['count'])
+
+                    if comparacion['solo_en_local']['count'] > 0:
+                        with st.expander(f"Ver {comparacion['solo_en_local']['count']} transacciones"):
+                            df = pd.DataFrame(comparacion['solo_en_local']['transacciones'])
+                            st.dataframe(df[['fecha', 'concepto', 'importe']], use_container_width=True)
+
+                with col2:
+                    st.metric("Total en el archivo", comparacion['total_remota'])
+                    st.metric("Solo en el archivo", comparacion['solo_en_remota']['count'])
+
+                    if comparacion['solo_en_remota']['count'] > 0:
+                        with st.expander(f"Ver {comparacion['solo_en_remota']['count']} transacciones"):
+                            df = pd.DataFrame(comparacion['solo_en_remota']['transacciones'])
+                            st.dataframe(df[['fecha', 'concepto', 'importe']], use_container_width=True)
+
+                st.metric("En ambos (sincronizadas)", comparacion['en_ambas'])
+
+                # Recomendación
+                if comparacion['solo_en_remota']['count'] > 0 and comparacion['solo_en_local']['count'] > 0:
+                    st.warning("⚠️ Ambos dispositivos tienen transacciones únicas. Considera importar en ambas direcciones.")
+                elif comparacion['solo_en_remota']['count'] > 0:
+                    st.info("💡 El archivo tiene transacciones nuevas. Ve a la pestaña 'Importar' para sincronizar.")
+                elif comparacion['solo_en_local']['count'] > 0:
+                    st.info("💡 Este dispositivo tiene transacciones nuevas. Ve a 'Exportar' para compartirlas.")
+                else:
+                    st.success("✅ Ambas bases de datos están completamente sincronizadas")
+
+            except Exception as e:
+                st.error(f"❌ Error al comparar: {e}")
+
 def mostrar_configuracion():
     st.title("⚙️ Configuración")
     st.subheader("Opciones de la Base de Datos")
@@ -456,7 +634,7 @@ def mostrar_configuracion():
                 db_manager.resetear_base_de_datos()
             st.success("¡Base de datos reseteada con éxito!")
             st.rerun()
-    
+
     st.write("Aquí irán otros ajustes generales de la aplicación.")
 
 # --- Lógica para mostrar la página seleccionada ---
@@ -468,5 +646,7 @@ elif pagina_seleccionada == "Importar":
     mostrar_importar()
 elif pagina_seleccionada == "Categorías":
     mostrar_categorias()
+elif pagina_seleccionada == "Sincronización":
+    mostrar_sincronizacion()
 elif pagina_seleccionada == "Configuración":
     mostrar_configuracion()
