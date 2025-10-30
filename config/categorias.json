@@ -1,0 +1,49 @@
+{
+  "_comentario": "Reglas para la clasificación automática de transacciones.",
+  "reglas": [
+    {
+      "patron": "RBO VIVAGYM",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": "NOMINA DE: FUNDACION MIGUEL SERVET",
+      "categoria": "FIJOS",
+      "tipo": "INGRESO"
+    },
+    {
+      "patron": "APPLE.COM/BILL",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": " bofff|boffff|boooff",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": "CLAUDE.AI SUBSCRIPTION",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": "ARKUPE|arkupe",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": "BAR ARKUPE",
+      "categoria": "DISFRUTE",
+      "tipo": "GASTO"
+    },
+    {
+      "patron": "",
+      "categoria": "FIJOS",
+      "tipo": "GASTO",
+      "importes_exactos": [
+        500.0,
+        275.0
+      ]
+    }
+  ]
+}

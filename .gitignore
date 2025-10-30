@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Database (temporal - se recreará en cloud)
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Configuración local
+opencode.json
+
+# Script de lanzamiento local
+launch_app.command
