@@ -50,287 +50,360 @@ MESES_INVERTIDO = {v: k for k, v in NOMBRES_MESES.items()}
 # --- Contenido principal de la página ---
 
 def mostrar_dashboard():
-    st.title("📊 Dashboard")
+    st.title("📊 Dashboard Financiero")
 
-    # --- Métrica Global: Líquido Disponible ---
-    liquido_disponible = metrics.calcular_liquido_disponible()
-    st.metric(
-        label="**💧 Líquido Disponible (Balance Total)**",
-        value=f"{liquido_disponible:.2f} €",
-        help="Suma total de todos los ingresos y gastos registrados en la base de datos."
-    )
-    st.markdown("---")
+    # --- Selectores de período en columnas ---
+    col_selector1, col_selector2, col_selector3 = st.columns([1, 1, 2])
 
-    # --- Selectores de período ---
     año_actual = datetime.date.today().year
-    año = st.sidebar.selectbox("Año", range(año_actual - 5, año_actual + 1), index=5)
-    
-    st.header(f"Resumen del año {año}")
+    mes_actual = datetime.date.today().month
 
-    tab_mensual, tab_anual = st.tabs(["Vista Mensual", "Vista Anual"])
+    with col_selector1:
+        año = st.selectbox("📅 Año", range(año_actual - 5, año_actual + 1), index=5)
 
-    with tab_mensual:
-        st.subheader("Análisis Mensual")
-        mes_actual = datetime.date.today().month
-        nombre_mes_seleccionado = st.selectbox("Selecciona un Mes", list(NOMBRES_MESES.values()), index=mes_actual - 1)
+    with col_selector2:
+        nombre_mes_seleccionado = st.selectbox("📆 Mes", list(NOMBRES_MESES.values()), index=mes_actual - 1)
         mes = MESES_INVERTIDO[nombre_mes_seleccionado]
 
-        with st.spinner(f"Calculando métricas para {nombre_mes_seleccionado}..."):
-            datos_mes = metrics.calcular_totales_mes(mes, año)
+    with col_selector3:
+        # Métrica Global: Líquido Disponible
+        liquido_disponible = metrics.calcular_liquido_disponible()
+        st.metric(
+            label="💧 Líquido Disponible Total",
+            value=f"{liquido_disponible:.2f} €",
+            help="Balance acumulado de todas tus transacciones"
+        )
 
-            # Métricas clave
-            col1, col2, col3 = st.columns(3)
-            col1.metric(label="💰 Ingresos del Mes", value=f"{datos_mes['total_ingresos']:.2f} €")
-            col2.metric(label="💸 Gastos del Mes", value=f"{datos_mes['total_gastos']:.2f} €")
-            col3.metric(
-                label="⚖️ Balance del Mes",
-                value=f"{datos_mes['balance_neto']:.2f} €",
-                delta=f"{datos_mes['balance_neto']:.2f} €",
-                delta_color=("normal" if datos_mes['balance_neto'] > 0 else "inverse")
-            )
+    st.markdown("---")
 
-            st.markdown("---")
+    # Tabs principales reorganizados
+    tab_resumen, tab_analisis, tab_historico = st.tabs([
+        "📊 Resumen General",
+        "📈 Análisis Avanzado",
+        "📉 Histórico"
+    ])
 
-            # Gráfico de distribución mensual
-            col_grafico, col_leyenda = st.columns([2, 1])
-            with col_grafico:
-                st.subheader(f"Distribución de Gastos de {nombre_mes_seleccionado}")
-                fig_distribucion_mes = visualizer.grafico_distribucion_gastos(datos_mes['gastos_por_categoria'])
-                if fig_distribucion_mes:
-                    st.plotly_chart(fig_distribucion_mes, use_container_width=True)
-                else:
-                    st.info("No hay datos de gastos para mostrar en este mes.")
-            
-            with col_leyenda:
-                st.subheader("Detalle por Categoría")
-                gastos_cat = datos_mes['gastos_por_categoria']
-                if gastos_cat:
-                    df_gastos = pd.DataFrame(list(gastos_cat.items()), columns=['Categoría', 'Importe'])
-                    df_gastos['Importe'] = df_gastos['Importe'].abs()
-                    total_gastos = df_gastos['Importe'].sum()
-                    df_gastos['Porcentaje'] = (df_gastos['Importe'] / total_gastos * 100).round(2)
-                    
-                    st.dataframe(
-                        df_gastos,
-                        column_config={
-                            "Importe": st.column_config.NumberColumn(format="%.2f €"),
-                            "Porcentaje": st.column_config.NumberColumn(format="%d%%"),
-                        },
-                        hide_index=True, use_container_width=True)
+    # ========== TAB 1: RESUMEN GENERAL ==========
+    with tab_resumen:
+        # Sub-tabs para mensual y anual
+        subtab_mes, subtab_año = st.tabs([f"📆 {nombre_mes_seleccionado} {año}", f"📅 Año {año}"])
 
-            # === MÉTRICAS AVANZADAS ===
-            st.markdown("---")
-            st.subheader("📈 Análisis Financiero Avanzado")
+        with subtab_mes:
+            with st.spinner("Calculando métricas mensuales..."):
+                datos_mes = metrics.calcular_totales_mes(mes, año)
 
-            # Financial Health Score
-            health_score = metrics.calcular_financial_health_score(mes, año)
+                # Métricas principales en cards
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💰 Ingresos", f"{datos_mes['total_ingresos']:.2f} €")
+                col2.metric("💸 Gastos", f"{abs(datos_mes['total_gastos']):.2f} €")
+                col3.metric(
+                    "⚖️ Balance",
+                    f"{datos_mes['balance_neto']:.2f} €",
+                    delta=f"{datos_mes['balance_neto']:.2f} €",
+                    delta_color="normal" if datos_mes['balance_neto'] > 0 else "inverse"
+                )
 
-            col1, col2, col3, col4 = st.columns(4)
+                # Tasa de ahorro rápida
+                tasa = metrics.calcular_tasa_ahorro(mes, año)
+                col4.metric(
+                    "💾 Tasa Ahorro",
+                    f"{tasa['tasa_ahorro']:.1f}%",
+                    delta=f"{tasa['ahorro_absoluto']:.0f} €"
+                )
 
-            # Score principal con color
-            score_color_map = {
-                'verde': 'normal',
-                'azul': 'normal',
-                'amarillo': 'off',
-                'rojo': 'inverse'
-            }
+                st.markdown("---")
 
-            col1.metric(
-                label="🏆 Financial Health Score",
-                value=f"{health_score['score']}/100",
-                delta=health_score['evaluacion'],
-                delta_color=score_color_map.get(health_score['color'], 'off')
-            )
+                # Gráficos en columnas
+                col_grafico, col_detalle = st.columns([2, 1])
 
-            # Tasa de ahorro
-            tasa_ahorro = metrics.calcular_tasa_ahorro(mes, año)
-            col2.metric(
-                label="💰 Tasa de Ahorro",
-                value=f"{tasa_ahorro['tasa_ahorro']:.1f}%",
-                delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €",
-                delta_color='normal' if tasa_ahorro['ahorro_absoluto'] > 0 else 'inverse'
-            )
-
-            # Gasto promedio diario
-            gasto_diario = metrics.calcular_gasto_promedio_diario(mes, año)
-            col3.metric(
-                label="📅 Gasto Promedio/Día",
-                value=f"{gasto_diario['promedio_diario']:.2f} €",
-                delta=f"Proyección: {gasto_diario['proyeccion_mes']:.0f} €",
-                delta_color='off'
-            )
-
-            # Proyección 3 meses
-            proyeccion = metrics.calcular_proyeccion_balance(meses_futuro=3)
-            col4.metric(
-                label="🔮 Balance en 3 Meses",
-                value=f"{proyeccion['balance_proyectado']:.0f} €",
-                delta=f"Confianza: {proyeccion['confianza']}",
-                delta_color='normal' if proyeccion['promedio_mensual'] > 0 else 'inverse'
-            )
-
-            st.markdown("---")
-
-            # Efficiency Ratios y Variación
-            col_ratios, col_variacion = st.columns(2)
-
-            with col_ratios:
-                st.markdown("### 📊 Ratios de Eficiencia")
-                ratios = metrics.calcular_efficiency_ratios(mes, año)
-
-                st.info(f"**Evaluación:** {ratios['evaluacion']}")
-
-                ratio_cols = st.columns(3)
-                ratio_fijos = ratios.get('ratio_fijos', 0)
-                ratio_disfrute = ratios.get('ratio_disfrute', 0)
-                ratio_extra = ratios.get('ratio_extraordinarios', 0)
-
-                ratio_cols[0].metric("FIJOS / Ingresos", f"{ratio_fijos:.1f}%",
-                                    delta="Ideal <30%", delta_color='off')
-                ratio_cols[1].metric("DISFRUTE / Ingresos", f"{ratio_disfrute:.1f}%",
-                                    delta="Ideal <30%", delta_color='off')
-                ratio_cols[2].metric("EXTRA / Ingresos", f"{ratio_extra:.1f}%",
-                                    delta="Ideal <10%", delta_color='off')
-
-            with col_variacion:
-                st.markdown("### 📉 Variación vs Mes Anterior")
-                variacion = metrics.calcular_variacion_mensual(mes, año)
-
-                if variacion['gastos_anterior'] > 0:
-                    delta_pct = variacion['variacion_total']
-                    if delta_pct < 0:
-                        st.success(f"✅ Gastaste **{abs(delta_pct):.1f}% menos** que el mes pasado")
-                    elif delta_pct > 0:
-                        st.warning(f"⚠️ Gastaste **{delta_pct:.1f}% más** que el mes pasado")
+                with col_grafico:
+                    st.markdown("### 📊 Distribución de Gastos")
+                    fig = visualizer.grafico_distribucion_gastos(datos_mes['gastos_por_categoria'])
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
                     else:
-                        st.info("➡️ Gastos similares al mes pasado")
+                        st.info("Sin datos de gastos")
 
-                    st.write(f"**Mes actual:** {variacion['gastos_actual']:.2f} €")
-                    st.write(f"**Mes anterior:** {variacion['gastos_anterior']:.2f} €")
+                with col_detalle:
+                    st.markdown("### 📋 Desglose")
+                    if datos_mes['gastos_por_categoria']:
+                        df = pd.DataFrame(list(datos_mes['gastos_por_categoria'].items()),
+                                        columns=['Categoría', 'Importe'])
+                        df['Importe'] = df['Importe'].abs()
+                        total = df['Importe'].sum()
+                        df['%'] = (df['Importe'] / total * 100).round(1)
 
-                    # Variaciones por categoría
-                    with st.expander("Ver detalles por categoría"):
+                        st.dataframe(
+                            df,
+                            column_config={
+                                "Importe": st.column_config.NumberColumn(format="%.0f €"),
+                                "%": st.column_config.NumberColumn(format="%.1f%%"),
+                            },
+                            hide_index=True,
+                            use_container_width=True
+                        )
+
+        with subtab_año:
+            with st.spinner("Calculando métricas anuales..."):
+                datos_anuales = metrics.calcular_totales_anual(año)
+
+                if datos_anuales:
+                    # Métricas anuales
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("💰 Ingresos Anuales", f"{datos_anuales['total_ingresos']:.2f} €")
+                    col2.metric("💸 Gastos Anuales", f"{abs(datos_anuales['total_gastos']):.2f} €")
+                    col3.metric(
+                        "⚖️ Balance Anual",
+                        f"{datos_anuales['balance_neto']:.2f} €",
+                        delta_color="normal" if datos_anuales['balance_neto'] > 0 else "inverse"
+                    )
+
+                    # Ahorro anual
+                    ahorro_anual = datos_anuales['balance_neto']
+                    if datos_anuales['total_ingresos'] > 0:
+                        tasa_anual = (ahorro_anual / datos_anuales['total_ingresos']) * 100
+                    else:
+                        tasa_anual = 0
+                    col4.metric("💾 Tasa Ahorro Anual", f"{tasa_anual:.1f}%")
+
+                    st.markdown("---")
+
+                    # Gráficos anuales
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("### 📈 Evolución Mensual")
+                        fig = visualizer.grafico_evolucion_anual(datos_anuales['evolucion_mensual'], NOMBRES_MESES)
+                        if fig:
+                            st.plotly_chart(fig, use_container_width=True)
+
+                    with col2:
+                        st.markdown("### 📊 Distribución Anual")
+                        fig = visualizer.grafico_distribucion_gastos(datos_anuales['gastos_por_categoria'])
+                        if fig:
+                            st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info(f"No hay datos para el año {año}")
+
+    # ========== TAB 2: ANÁLISIS AVANZADO ==========
+    with tab_analisis:
+        analisis_tabs = st.tabs(["📆 Mensual", "📅 Anual"])
+
+        # ANÁLISIS MENSUAL
+        with analisis_tabs[0]:
+            with st.spinner("Calculando análisis avanzado..."):
+                # Financial Health Score destacado
+                health = metrics.calcular_financial_health_score(mes, año)
+
+                st.markdown("### 🏆 Financial Health Score")
+
+                score_cols = st.columns([1, 2, 1])
+                with score_cols[1]:
+                    # Score grande y centrado
+                    score_emoji = {
+                        'verde': '🌟',
+                        'azul': '👍',
+                        'amarillo': '⚠️',
+                        'rojo': '❌'
+                    }.get(health['color'], '📊')
+
+                    st.markdown(f"""
+                    <div style='text-align: center; padding: 20px; background-color: #f0f2f6; border-radius: 10px;'>
+                        <h1 style='font-size: 4em; margin: 0;'>{health['score']}</h1>
+                        <p style='font-size: 1.5em; margin: 0;'>{score_emoji} {health['evaluacion']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                # Métricas en expanders organizados
+                with st.expander("💰 Ahorro y Proyecciones", expanded=True):
+                    col1, col2, col3 = st.columns(3)
+
+                    tasa_ahorro = metrics.calcular_tasa_ahorro(mes, año)
+                    col1.metric(
+                        "Tasa de Ahorro",
+                        f"{tasa_ahorro['tasa_ahorro']:.1f}%",
+                        delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €"
+                    )
+
+                    gasto_diario = metrics.calcular_gasto_promedio_diario(mes, año)
+                    col2.metric(
+                        "Gasto Promedio/Día",
+                        f"{gasto_diario['promedio_diario']:.2f} €",
+                        delta=f"Proyección mes: {gasto_diario['proyeccion_mes']:.0f} €"
+                    )
+
+                    proyeccion = metrics.calcular_proyeccion_balance(3)
+                    col3.metric(
+                        "Balance en 3 Meses",
+                        f"{proyeccion['balance_proyectado']:.0f} €",
+                        delta=f"Confianza: {proyeccion['confianza']}"
+                    )
+
+                with st.expander("📊 Efficiency Ratios"):
+                    ratios = metrics.calcular_efficiency_ratios(mes, año)
+                    st.info(f"**{ratios['evaluacion']}**")
+
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("FIJOS/Ingresos", f"{ratios.get('ratio_fijos', 0):.1f}%", delta="Ideal <30%")
+                    col2.metric("DISFRUTE/Ingresos", f"{ratios.get('ratio_disfrute', 0):.1f}%", delta="Ideal <30%")
+                    col3.metric("EXTRA/Ingresos", f"{ratios.get('ratio_extraordinarios', 0):.1f}%", delta="Ideal <10%")
+
+                with st.expander("📉 Variación vs Mes Anterior"):
+                    variacion = metrics.calcular_variacion_mensual(mes, año)
+
+                    if variacion['gastos_anterior'] > 0:
+                        delta = variacion['variacion_total']
+                        if delta < 0:
+                            st.success(f"✅ **{abs(delta):.1f}% menos** que el mes pasado")
+                        elif delta > 0:
+                            st.warning(f"⚠️ **{delta:.1f}% más** que el mes pasado")
+                        else:
+                            st.info("➡️ Gastos similares")
+
+                        col1, col2 = st.columns(2)
+                        col1.metric("Mes Actual", f"{variacion['gastos_actual']:.2f} €")
+                        col2.metric("Mes Anterior", f"{variacion['gastos_anterior']:.2f} €")
+
+                        # Por categoría
                         for cat, datos in variacion['por_categoria'].items():
                             if datos['variacion'] != 0:
                                 icono = "📈" if datos['variacion'] > 0 else "📉"
-                                st.write(f"{icono} **{cat}**: {datos['variacion']:+.1f}% ({datos['actual']:.2f} € vs {datos['anterior']:.2f} €)")
-                else:
-                    st.info("No hay datos del mes anterior para comparar")
+                                st.caption(f"{icono} **{cat}**: {datos['variacion']:+.1f}%")
+                    else:
+                        st.info("Sin datos del mes anterior")
 
-            st.markdown("---")
+                with st.expander("🔝 Top 10 Gastos"):
+                    top = metrics.calcular_top_gastos(mes, año, 10)
+                    if top:
+                        df = pd.DataFrame(top)
+                        df['importe'] = df['importe'].abs()
+                        st.dataframe(
+                            df[['fecha', 'concepto', 'importe', 'categoria']],
+                            column_config={
+                                "fecha": "Fecha",
+                                "concepto": "Concepto",
+                                "importe": st.column_config.NumberColumn("Importe", format="%.2f €"),
+                                "categoria": "Categoría"
+                            },
+                            hide_index=True,
+                            use_container_width=True
+                        )
 
-            # Top Gastos del Mes
-            st.markdown("### 🔝 Top 10 Gastos del Mes")
-            top_gastos = metrics.calcular_top_gastos(mes, año, limite=10)
+                        total_top = df['importe'].sum()
+                        datos_mes_top = metrics.calcular_totales_mes(mes, año)
+                        pct = (total_top / abs(datos_mes_top['total_gastos'])) * 100
+                        st.caption(f"💡 Representan el **{pct:.1f}%** del total")
 
-            if top_gastos:
-                df_top = pd.DataFrame(top_gastos)
-                df_top['importe_abs'] = df_top['importe'].abs()
-                df_top_display = df_top[['fecha', 'concepto', 'importe_abs', 'categoria']].copy()
-                df_top_display.columns = ['Fecha', 'Concepto', 'Importe', 'Categoría']
+                with st.expander("🔍 Desglose del Health Score"):
+                    col1, col2, col3, col4 = st.columns(4)
+                    desg = health['desglose']
 
-                st.dataframe(
-                    df_top_display,
-                    column_config={
-                        "Fecha": st.column_config.DateColumn(format="DD/MM/YYYY"),
-                        "Importe": st.column_config.NumberColumn(format="%.2f €"),
-                    },
-                    hide_index=True,
-                    use_container_width=True
-                )
+                    col1.metric("Ahorro", f"{desg['ahorro']}/30")
+                    col2.metric("Eficiencia", f"{desg['eficiencia_fijos']}/25")
+                    col3.metric("Estabilidad", f"{desg['estabilidad']}/25")
+                    col4.metric("Tendencia", f"{desg['tendencia']}/20")
 
-                total_top10 = df_top['importe_abs'].sum()
-                total_mes = abs(datos_mes['total_gastos'])
-                if total_mes > 0:
-                    porcentaje_top10 = (total_top10 / total_mes) * 100
-                    st.caption(f"💡 Estos 10 gastos representan el **{porcentaje_top10:.1f}%** del total del mes")
-            else:
-                st.info("No hay gastos registrados este mes")
+        # ANÁLISIS ANUAL
+        with analisis_tabs[1]:
+            st.markdown("### 📅 Métricas Anuales Avanzadas")
 
-            # Desglose del Score
-            with st.expander("🔍 Desglose del Financial Health Score"):
-                st.write("**Componentes del score:**")
-
-                score_data = health_score['desglose']
-                col1, col2, col3, col4 = st.columns(4)
-
-                col1.metric("Ahorro", f"{score_data['ahorro']}/30",
-                           delta=f"{health_score['metricas']['tasa_ahorro']:.1f}%")
-                col2.metric("Eficiencia Fijos", f"{score_data['eficiencia_fijos']}/25",
-                           delta=f"{health_score['metricas']['ratio_fijos']:.1f}%")
-                col3.metric("Estabilidad", f"{score_data['estabilidad']}/25")
-                col4.metric("Tendencia", f"{score_data['tendencia']}/20",
-                           delta=f"{health_score['metricas']['variacion']:+.1f}%")
-
-                st.markdown("""
-                **Interpretación:**
-                - **80-100**: 🌟 Excelente control financiero
-                - **60-79**: 👍 Buen manejo, ligeras mejoras posibles
-                - **40-59**: ⚠️ Regular, considera optimizar gastos
-                - **0-39**: ❌ Necesita atención urgente
-                """)
-
-    with tab_anual:
-        st.subheader("Análisis Anual")
-        with st.spinner(f"Calculando métricas para el año {año}..."):
             datos_anuales = metrics.calcular_totales_anual(año)
+
             if datos_anuales:
-                # Métricas clave anuales
                 col1, col2, col3 = st.columns(3)
-                col1.metric(label="💰 Ingresos Anuales", value=f"{datos_anuales['total_ingresos']:.2f} €")
-                col2.metric(label="💸 Gastos Anuales", value=f"{datos_anuales['total_gastos']:.2f} €")
-                col3.metric(
-                    label="⚖️ Balance Anual",
-                    value=f"{datos_anuales['balance_neto']:.2f} €",
-                    delta=f"{datos_anuales['balance_neto']:.2f} €",
-                    delta_color=("normal" if datos_anuales['balance_neto'] > 0 else "inverse")
+
+                # Ahorro anual total
+                ahorro_anual = datos_anuales['balance_neto']
+                ingresos_anuales = datos_anuales['total_ingresos']
+                gastos_anuales = abs(datos_anuales['total_gastos'])
+
+                tasa_ahorro_anual = (ahorro_anual / ingresos_anuales * 100) if ingresos_anuales > 0 else 0
+
+                col1.metric(
+                    "💰 Ahorro Anual Total",
+                    f"{ahorro_anual:.2f} €",
+                    delta=f"Tasa: {tasa_ahorro_anual:.1f}%"
                 )
+
+                # Promedio mensual
+                promedio_gasto_mensual = gastos_anuales / 12
+                col2.metric(
+                    "📊 Promedio Gasto/Mes",
+                    f"{promedio_gasto_mensual:.2f} €"
+                )
+
+                promedio_ingreso_mensual = ingresos_anuales / 12
+                col3.metric(
+                    "💵 Promedio Ingreso/Mes",
+                    f"{promedio_ingreso_mensual:.2f} €"
+                )
+
                 st.markdown("---")
 
-                # Gráficos anuales
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader("Evolución de Ingresos y Gastos")
-                    fig_evolucion_anual = visualizer.grafico_evolucion_anual(datos_anuales['evolucion_mensual'], NOMBRES_MESES)
-                    if fig_evolucion_anual:
-                        st.plotly_chart(fig_evolucion_anual, use_container_width=True)
-                    else:
-                        st.info("No hay datos para mostrar la evolución anual.")
-                
-                with col2:
-                    st.subheader("Distribución Anual de Gastos")
-                    gastos_anuales_cat = datos_anuales['gastos_por_categoria']
-                    fig_distribucion_anual = visualizer.grafico_distribucion_gastos(gastos_anuales_cat)
-                    
-                    if fig_distribucion_anual:
-                        st.plotly_chart(fig_distribucion_anual, use_container_width=True)
-                        
-                        # Crear la leyenda detallada
-                        df_gastos_anual = pd.DataFrame(list(gastos_anuales_cat.items()), columns=['Categoría', 'Importe'])
-                        df_gastos_anual['Importe'] = df_gastos_anual['Importe'].abs()
-                        total_gastos_anual = df_gastos_anual['Importe'].sum()
-                        df_gastos_anual['Porcentaje'] = (df_gastos_anual['Importe'] / total_gastos_anual * 100).round(2)
-                        
-                        st.dataframe(
-                            df_gastos_anual,
-                            column_config={
-                                "Importe": st.column_config.NumberColumn(format="%.2f €"),
-                                "Porcentaje": st.column_config.NumberColumn(format="%d%%"),
-                            },
-                            hide_index=True, use_container_width=True)
-                    else:
-                        st.info("No hay datos de gastos para mostrar en el gráfico anual.")
-            else:
-                st.info(f"No se encontraron transacciones para el año {año}.")
+                # Mejor y peor mes
+                evol = datos_anuales['evolucion_mensual']
+                if not evol.empty and 'balance' in evol.columns:
+                    mejor_mes_idx = evol['balance'].idxmax()
+                    peor_mes_idx = evol['balance'].idxmin()
 
-    st.markdown("---")
-    st.subheader("Evolución Histórica (Últimos 12 meses)")
-    df_evolucion = metrics.calcular_evolucion_mensual()
-    fig_evolucion = visualizer.grafico_evolucion_mensual(df_evolucion)
-    if fig_evolucion:
-        st.plotly_chart(fig_evolucion, use_container_width=True)
-    else:
-        st.info("No hay suficientes datos históricos para mostrar la evolución.")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.success(f"🌟 **Mejor Mes:** {NOMBRES_MESES.get(mejor_mes_idx + 1, 'N/A')}")
+                        st.write(f"Balance: {evol.loc[mejor_mes_idx, 'balance']:.2f} €")
+
+                    with col2:
+                        st.error(f"⚠️ **Peor Mes:** {NOMBRES_MESES.get(peor_mes_idx + 1, 'N/A')}")
+                        st.write(f"Balance: {evol.loc[peor_mes_idx, 'balance']:.2f} €")
+
+                st.markdown("---")
+
+                # Distribución anual por categoría
+                st.markdown("### 📊 Distribución Anual Detallada")
+
+                gastos_cat = datos_anuales['gastos_por_categoria']
+                if gastos_cat:
+                    df_cat = pd.DataFrame(list(gastos_cat.items()), columns=['Categoría', 'Total'])
+                    df_cat['Total'] = df_cat['Total'].abs()
+                    df_cat['%'] = (df_cat['Total'] / df_cat['Total'].sum() * 100).round(1)
+                    df_cat['Promedio/Mes'] = (df_cat['Total'] / 12).round(2)
+
+                    st.dataframe(
+                        df_cat,
+                        column_config={
+                            "Total": st.column_config.NumberColumn(format="%.2f €"),
+                            "%": st.column_config.NumberColumn(format="%.1f%%"),
+                            "Promedio/Mes": st.column_config.NumberColumn(format="%.2f €")
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+            else:
+                st.info(f"No hay datos para el año {año}")
+
+    # ========== TAB 3: HISTÓRICO ==========
+    with tab_historico:
+        st.markdown("### 📉 Evolución Últimos 12 Meses")
+
+        df_evol = metrics.calcular_evolucion_mensual()
+        fig = visualizer.grafico_evolucion_mensual(df_evol)
+
+        if fig:
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Estadísticas del histórico
+            if not df_evol.empty:
+                with st.expander("📊 Estadísticas del Período"):
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    col1.metric("💰 Total Ingresos", f"{df_evol['ingresos'].sum():.2f} €")
+                    col2.metric("💸 Total Gastos", f"{abs(df_evol['gastos'].sum()):.2f} €")
+                    col3.metric("⚖️ Balance Total", f"{df_evol['balance'].sum():.2f} €")
+                    col4.metric("📈 Promedio Balance/Mes", f"{df_evol['balance'].mean():.2f} €")
+        else:
+            st.info("No hay suficientes datos históricos")
 
 def mostrar_transacciones():
     st.title("💸 Transacciones")
