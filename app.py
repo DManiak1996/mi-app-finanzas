@@ -118,6 +118,158 @@ def mostrar_dashboard():
                         },
                         hide_index=True, use_container_width=True)
 
+            # === MÉTRICAS AVANZADAS ===
+            st.markdown("---")
+            st.subheader("📈 Análisis Financiero Avanzado")
+
+            # Financial Health Score
+            health_score = metrics.calcular_financial_health_score(mes, año)
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            # Score principal con color
+            score_color_map = {
+                'verde': 'normal',
+                'azul': 'normal',
+                'amarillo': 'off',
+                'rojo': 'inverse'
+            }
+
+            col1.metric(
+                label="🏆 Financial Health Score",
+                value=f"{health_score['score']}/100",
+                delta=health_score['evaluacion'],
+                delta_color=score_color_map.get(health_score['color'], 'off')
+            )
+
+            # Tasa de ahorro
+            tasa_ahorro = metrics.calcular_tasa_ahorro(mes, año)
+            col2.metric(
+                label="💰 Tasa de Ahorro",
+                value=f"{tasa_ahorro['tasa_ahorro']:.1f}%",
+                delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €",
+                delta_color='normal' if tasa_ahorro['ahorro_absoluto'] > 0 else 'inverse'
+            )
+
+            # Gasto promedio diario
+            gasto_diario = metrics.calcular_gasto_promedio_diario(mes, año)
+            col3.metric(
+                label="📅 Gasto Promedio/Día",
+                value=f"{gasto_diario['promedio_diario']:.2f} €",
+                delta=f"Proyección: {gasto_diario['proyeccion_mes']:.0f} €",
+                delta_color='off'
+            )
+
+            # Proyección 3 meses
+            proyeccion = metrics.calcular_proyeccion_balance(meses_futuro=3)
+            col4.metric(
+                label="🔮 Balance en 3 Meses",
+                value=f"{proyeccion['balance_proyectado']:.0f} €",
+                delta=f"Confianza: {proyeccion['confianza']}",
+                delta_color='normal' if proyeccion['promedio_mensual'] > 0 else 'inverse'
+            )
+
+            st.markdown("---")
+
+            # Efficiency Ratios y Variación
+            col_ratios, col_variacion = st.columns(2)
+
+            with col_ratios:
+                st.markdown("### 📊 Ratios de Eficiencia")
+                ratios = metrics.calcular_efficiency_ratios(mes, año)
+
+                st.info(f"**Evaluación:** {ratios['evaluacion']}")
+
+                ratio_cols = st.columns(3)
+                ratio_fijos = ratios.get('ratio_fijos', 0)
+                ratio_disfrute = ratios.get('ratio_disfrute', 0)
+                ratio_extra = ratios.get('ratio_extraordinarios', 0)
+
+                ratio_cols[0].metric("FIJOS / Ingresos", f"{ratio_fijos:.1f}%",
+                                    delta="Ideal <30%", delta_color='off')
+                ratio_cols[1].metric("DISFRUTE / Ingresos", f"{ratio_disfrute:.1f}%",
+                                    delta="Ideal <30%", delta_color='off')
+                ratio_cols[2].metric("EXTRA / Ingresos", f"{ratio_extra:.1f}%",
+                                    delta="Ideal <10%", delta_color='off')
+
+            with col_variacion:
+                st.markdown("### 📉 Variación vs Mes Anterior")
+                variacion = metrics.calcular_variacion_mensual(mes, año)
+
+                if variacion['gastos_anterior'] > 0:
+                    delta_pct = variacion['variacion_total']
+                    if delta_pct < 0:
+                        st.success(f"✅ Gastaste **{abs(delta_pct):.1f}% menos** que el mes pasado")
+                    elif delta_pct > 0:
+                        st.warning(f"⚠️ Gastaste **{delta_pct:.1f}% más** que el mes pasado")
+                    else:
+                        st.info("➡️ Gastos similares al mes pasado")
+
+                    st.write(f"**Mes actual:** {variacion['gastos_actual']:.2f} €")
+                    st.write(f"**Mes anterior:** {variacion['gastos_anterior']:.2f} €")
+
+                    # Variaciones por categoría
+                    with st.expander("Ver detalles por categoría"):
+                        for cat, datos in variacion['por_categoria'].items():
+                            if datos['variacion'] != 0:
+                                icono = "📈" if datos['variacion'] > 0 else "📉"
+                                st.write(f"{icono} **{cat}**: {datos['variacion']:+.1f}% ({datos['actual']:.2f} € vs {datos['anterior']:.2f} €)")
+                else:
+                    st.info("No hay datos del mes anterior para comparar")
+
+            st.markdown("---")
+
+            # Top Gastos del Mes
+            st.markdown("### 🔝 Top 10 Gastos del Mes")
+            top_gastos = metrics.calcular_top_gastos(mes, año, limite=10)
+
+            if top_gastos:
+                df_top = pd.DataFrame(top_gastos)
+                df_top['importe_abs'] = df_top['importe'].abs()
+                df_top_display = df_top[['fecha', 'concepto', 'importe_abs', 'categoria']].copy()
+                df_top_display.columns = ['Fecha', 'Concepto', 'Importe', 'Categoría']
+
+                st.dataframe(
+                    df_top_display,
+                    column_config={
+                        "Fecha": st.column_config.DateColumn(format="DD/MM/YYYY"),
+                        "Importe": st.column_config.NumberColumn(format="%.2f €"),
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+                total_top10 = df_top['importe_abs'].sum()
+                total_mes = abs(datos_mes['total_gastos'])
+                if total_mes > 0:
+                    porcentaje_top10 = (total_top10 / total_mes) * 100
+                    st.caption(f"💡 Estos 10 gastos representan el **{porcentaje_top10:.1f}%** del total del mes")
+            else:
+                st.info("No hay gastos registrados este mes")
+
+            # Desglose del Score
+            with st.expander("🔍 Desglose del Financial Health Score"):
+                st.write("**Componentes del score:**")
+
+                score_data = health_score['desglose']
+                col1, col2, col3, col4 = st.columns(4)
+
+                col1.metric("Ahorro", f"{score_data['ahorro']}/30",
+                           delta=f"{health_score['metricas']['tasa_ahorro']:.1f}%")
+                col2.metric("Eficiencia Fijos", f"{score_data['eficiencia_fijos']}/25",
+                           delta=f"{health_score['metricas']['ratio_fijos']:.1f}%")
+                col3.metric("Estabilidad", f"{score_data['estabilidad']}/25")
+                col4.metric("Tendencia", f"{score_data['tendencia']}/20",
+                           delta=f"{health_score['metricas']['variacion']:+.1f}%")
+
+                st.markdown("""
+                **Interpretación:**
+                - **80-100**: 🌟 Excelente control financiero
+                - **60-79**: 👍 Buen manejo, ligeras mejoras posibles
+                - **40-59**: ⚠️ Regular, considera optimizar gastos
+                - **0-39**: ❌ Necesita atención urgente
+                """)
+
     with tab_anual:
         st.subheader("Análisis Anual")
         with st.spinner(f"Calculando métricas para el año {año}..."):
