@@ -207,43 +207,56 @@ def mostrar_dashboard():
                 if transacciones:
                     df_trans = pd.DataFrame(transacciones)
                     df_trans['fecha'] = pd.to_datetime(df_trans['fecha'])
-                    # Ordenar por fecha Y por saldo_posterior (descendente) para orden cronológico correcto
-                    # Las transacciones del mismo día se ordenan por saldo (del más alto al más bajo)
-                    # porque el banco las procesa en orden inverso al que aparecen en el Excel
-                    df_trans = df_trans.sort_values(['fecha', 'saldo_posterior'], ascending=[True, False])
 
                     # Calcular el saldo inicial del mes:
-                    # Obtener el último saldo_posterior del mes anterior
+                    # Método robusto que maneja ingresos y gastos en el último día del mes anterior
                     conn_temp = db_manager.get_db_connection()
                     cursor_temp = conn_temp.cursor()
 
-                    # Buscar última transacción del mes anterior con saldo_posterior
+                    # 1. Obtener la fecha máxima del mes anterior
                     cursor_temp.execute("""
-                        SELECT saldo_posterior
+                        SELECT MAX(fecha) as ultima_fecha
                         FROM transacciones
-                        WHERE saldo_posterior IS NOT NULL
-                        AND (año < ? OR (año = ? AND mes < ?))
-                        ORDER BY fecha DESC, id DESC
-                        LIMIT 1
+                        WHERE (año < ? OR (año = ? AND mes < ?))
                     """, (año, año, mes))
 
-                    resultado = cursor_temp.fetchone()
-                    conn_temp.close()
+                    fecha_max = cursor_temp.fetchone()['ultima_fecha']
 
-                    if resultado:
-                        # Usar el último saldo del mes anterior
-                        saldo_inicial = resultado['saldo_posterior']
+                    if fecha_max:
+                        # 2. Obtener todas las transacciones del último día
+                        cursor_temp.execute("""
+                            SELECT saldo_posterior, importe
+                            FROM transacciones
+                            WHERE fecha = ? AND saldo_posterior IS NOT NULL
+                        """, (fecha_max,))
+
+                        trans_ultimo_dia = cursor_temp.fetchall()
+
+                        if trans_ultimo_dia:
+                            # 3. Calcular suma neta de importes del último día
+                            suma_importes = sum(t['importe'] for t in trans_ultimo_dia)
+
+                            # 4. Elegir saldo según si hubo ingreso o gasto neto
+                            saldos = [t['saldo_posterior'] for t in trans_ultimo_dia]
+                            if suma_importes >= 0:
+                                # Ingreso neto → el saldo más ALTO es el final
+                                saldo_inicial = max(saldos)
+                            else:
+                                # Gasto neto → el saldo más BAJO es el final
+                                saldo_inicial = min(saldos)
+                        else:
+                            saldo_inicial = config_manager.obtener_saldo_inicial()
                     else:
-                        # Si no hay mes anterior, usar saldo_inicial de config
                         saldo_inicial = config_manager.obtener_saldo_inicial()
 
-                    # Usar saldo_posterior real si está disponible, sino calcular
-                    if 'saldo_posterior' in df_trans.columns and df_trans['saldo_posterior'].notna().all():
-                        # USAR SALDOS REALES DEL BANCO
-                        df_trans['saldo_disponible'] = df_trans['saldo_posterior']
-                    else:
-                        # CALCULAR (fallback para transacciones sin saldo_posterior)
-                        df_trans['saldo_disponible'] = saldo_inicial + df_trans['importe'].cumsum()
+                    conn_temp.close()
+
+                    # Ahora ordenar para el gráfico por fecha e ID
+                    df_trans = df_trans.sort_values(['fecha', 'id'], ascending=[True, True])
+
+                    # SIEMPRE CALCULAR el saldo para evitar inconsistencias del banco
+                    # El saldo_posterior del banco puede tener errores de ordenamiento
+                    df_trans['saldo_disponible'] = saldo_inicial + df_trans['importe'].cumsum()
 
                     # Añadir punto inicial del mes (saldo al cierre del mes anterior)
                     fecha_inicial = df_trans['fecha'].min() - pd.Timedelta(days=1)
