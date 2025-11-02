@@ -29,22 +29,47 @@ def inicializar_app():
 
 inicializar_app()
 
+# --- CSS personalizado para mejorar UX ---
+st.markdown("""
+<style>
+/* Botones más grandes para mejor usabilidad móvil (WCAG AAA: 44x44px mínimo) */
+.stButton button {
+    min-height: 44px !important;
+    padding: 12px 24px !important;
+    font-size: 16px !important;
+}
+
+/* Form submit buttons aún más prominentes */
+.stButton button[kind="primary"] {
+    min-height: 48px !important;
+    font-weight: 600 !important;
+}
+
+/* Mejorar inputs en móvil */
+.stTextInput input, .stNumberInput input, .stSelectbox select {
+    min-height: 44px !important;
+    font-size: 16px !important; /* Previene zoom automático en iOS */
+}
+
+/* Mejorar legibilidad de métricas */
+.stMetric {
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- Barra lateral de navegación ---
 st.sidebar.title("Navegación")
 
-# Sincronizar navegación por botón con radio
+# Navegación simple con radio button
 PAGINAS = ["Dashboard", "Añadir Gasto", "Transacciones", "Importar", "Categorías", "🔌 Coche Eléctrico", "Sincronización", "Configuración"]
-
-if 'pagina_navegacion' in st.session_state:
-    indice_inicial = PAGINAS.index(st.session_state['pagina_navegacion'])
-    del st.session_state['pagina_navegacion']  # Limpiar después de usarlo
-else:
-    indice_inicial = 0
 
 pagina_seleccionada = st.sidebar.radio(
     "Elige una página:",
     PAGINAS,
-    index=indice_inicial
+    index=0
 )
 
 st.sidebar.markdown("---")
@@ -88,11 +113,9 @@ def mostrar_dashboard():
         )
 
     with col_selector4:
-        # Botón para añadir gasto
+        # Info: Usuario puede navegar con el sidebar
         st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear con los selectores
-        if st.button("➕ Añadir Gasto", type="primary", use_container_width=True):
-            st.session_state['pagina_navegacion'] = "Añadir Gasto"
-            st.rerun()
+        st.info("💡 Usa el menú lateral para añadir gastos")
 
     st.markdown("---")
 
@@ -112,8 +135,8 @@ def mostrar_dashboard():
             with st.spinner("Calculando métricas mensuales..."):
                 datos_mes = metrics.calcular_totales_mes(mes, año)
 
-                # Métricas principales en cards
-                col1, col2, col3, col4 = st.columns(4)
+                # Métricas principales en cards - Layout responsive (2x2)
+                col1, col2 = st.columns(2)
                 col1.metric(
                     "💰 Ingresos",
                     f"{datos_mes['total_ingresos']:.2f} €",
@@ -124,6 +147,8 @@ def mostrar_dashboard():
                     f"{abs(datos_mes['total_gastos']):.2f} €",
                     help="Suma total de todos los gastos del mes (en valor absoluto)"
                 )
+
+                col3, col4 = st.columns(2)
                 col3.metric(
                     "⚖️ Balance",
                     f"{datos_mes['balance_neto']:.2f} €",
@@ -147,7 +172,7 @@ def mostrar_dashboard():
                 col_grafico, col_detalle = st.columns([2, 1])
 
                 with col_grafico:
-                    st.markdown("### 📊 Distribución de Gastos")
+                    st.subheader("📊 Distribución de Gastos")
                     fig = visualizer.grafico_distribucion_gastos(datos_mes['gastos_por_categoria'])
                     if fig:
                         st.plotly_chart(fig, use_container_width=True, key="plot_gastos_mes")
@@ -176,7 +201,7 @@ def mostrar_dashboard():
                 st.markdown("---")
 
                 # Gráfico de evolución del saldo disponible
-                st.markdown("### 📈 Evolución del Saldo Disponible")
+                st.subheader("📈 Evolución del Saldo Disponible")
                 transacciones = db_manager.obtener_transacciones(mes=mes, año=año)
 
                 if transacciones:
@@ -281,8 +306,8 @@ def mostrar_dashboard():
 
                     st.plotly_chart(fig, use_container_width=True, key="plot_evolucion_saldo_mes")
 
-                    # Estadísticas del mes
-                    col1, col2, col3, col4 = st.columns(4)
+                    # Estadísticas del mes - Layout responsive (2x2)
+                    col1, col2 = st.columns(2)
                     num_transacciones = len(df_trans)
                     col1.metric(
                         "📊 Transacciones",
@@ -294,6 +319,8 @@ def mostrar_dashboard():
                         f"{saldo_inicial:.2f} €",
                         help="Saldo disponible al inicio del mes (cierre del mes anterior)"
                     )
+
+                    col3, col4 = st.columns(2)
                     col3.metric(
                         "💰 Saldo Final",
                         f"{df_trans['saldo_disponible'].iloc[-1]:.2f} €",
@@ -313,8 +340,8 @@ def mostrar_dashboard():
                 datos_anuales = metrics.calcular_totales_anual(año)
 
                 if datos_anuales:
-                    # Métricas anuales
-                    col1, col2, col3, col4 = st.columns(4)
+                    # Métricas anuales - Layout responsive (2x2)
+                    col1, col2 = st.columns(2)
                     col1.metric(
                         "💰 Ingresos Anuales",
                         f"{datos_anuales['total_ingresos']:.2f} €",
@@ -325,6 +352,8 @@ def mostrar_dashboard():
                         f"{abs(datos_anuales['total_gastos']):.2f} €",
                         help="Suma total de gastos en todos los meses del año"
                     )
+
+                    col3, col4 = st.columns(2)
                     col3.metric(
                         "⚖️ Balance Anual",
                         f"{datos_anuales['balance_neto']:.2f} €",
@@ -373,7 +402,7 @@ def mostrar_dashboard():
                 # Financial Health Score destacado
                 health = metrics.calcular_financial_health_score(mes, año)
 
-                st.markdown("### 🏆 Financial Health Score")
+                st.subheader("🏆 Financial Health Score")
 
                 score_cols = st.columns([1, 2, 1])
                 with score_cols[1]:
@@ -493,7 +522,8 @@ def mostrar_dashboard():
                         st.caption(f"💡 Representan el **{pct:.1f}%** del total")
 
                 with st.expander("🔍 Desglose del Health Score"):
-                    col1, col2, col3, col4 = st.columns(4)
+                    # Layout responsive (2x2)
+                    col1, col2 = st.columns(2)
                     desg = health['desglose']
 
                     col1.metric(
@@ -506,6 +536,8 @@ def mostrar_dashboard():
                         f"{desg['eficiencia_fijos']}/25",
                         help="Puntos por eficiencia en gastos fijos. Máximo 25pts. Cuanto menor sea tu ratio de gastos fijos, más puntos"
                     )
+
+                    col3, col4 = st.columns(2)
                     col3.metric(
                         "Estabilidad",
                         f"{desg['estabilidad']}/25",
@@ -519,7 +551,7 @@ def mostrar_dashboard():
 
         # ANÁLISIS ANUAL
         with analisis_tabs[1]:
-            st.markdown("### 📅 Métricas Anuales Avanzadas")
+            st.subheader("📅 Métricas Anuales Avanzadas")
 
             datos_anuales = metrics.calcular_totales_anual(año)
 
@@ -600,7 +632,7 @@ def mostrar_dashboard():
 
     # ========== TAB 3: HISTÓRICO ==========
     with tab_historico:
-        st.markdown("### 📉 Evolución Últimos 12 Meses")
+        st.subheader("📉 Evolución Últimos 12 Meses")
 
         df_evol = metrics.calcular_evolucion_mensual()
         fig = visualizer.grafico_evolucion_mensual(df_evol)
@@ -611,10 +643,12 @@ def mostrar_dashboard():
             # Estadísticas del histórico
             if not df_evol.empty:
                 with st.expander("📊 Estadísticas del Período"):
-                    col1, col2, col3, col4 = st.columns(4)
-
+                    # Layout responsive (2x2)
+                    col1, col2 = st.columns(2)
                     col1.metric("💰 Total Ingresos", f"{df_evol['ingresos'].sum():.2f} €")
                     col2.metric("💸 Total Gastos", f"{abs(df_evol['gastos'].sum()):.2f} €")
+
+                    col3, col4 = st.columns(2)
                     col3.metric("⚖️ Balance Total", f"{df_evol['balance'].sum():.2f} €")
                     col4.metric("📈 Promedio Balance/Mes", f"{df_evol['balance'].mean():.2f} €")
         else:
@@ -711,7 +745,9 @@ def mostrar_añadir_gasto():
                         col3.metric("Categoría", categoria)
 
                 except Exception as e:
-                    st.error(f"❌ Error al guardar: {str(e)}")
+                    # Log técnico para debugging (si tienes logger)
+                    # logger.error(f"Error al insertar gasto: {e}")
+                    st.error("❌ No se pudo guardar el gasto. Por favor, inténtalo de nuevo o verifica los datos.")
 
     # Separador
     st.markdown("---")
@@ -749,7 +785,8 @@ def mostrar_añadir_gasto():
             st.info("Aún no has registrado ningún gasto")
 
     except Exception as e:
-        st.error(f"Error al cargar últimos gastos: {e}")
+        # logger.error(f"Error al cargar últimos gastos: {e}")
+        st.error("❌ No se pudieron cargar los últimos gastos. Intenta recargar la página.")
 
     # Información sobre duplicados
     with st.expander("ℹ️ ¿Qué pasa cuando importo mi extracto bancario?"):
@@ -1162,8 +1199,9 @@ def mostrar_sincronizacion():
 
                         st.info("💡 Refresca la página para ver los datos actualizados")
 
-            except Exception as e:
-                st.error(f"❌ Error al procesar el archivo: {e}")
+            except Exception:
+                # logger.error(f"Error al procesar archivo de sincronización")
+                st.error("❌ No se pudo procesar el archivo. Asegúrate de que es un archivo JSON válido exportado desde esta aplicación.")
 
     with tab_comparar:
         st.subheader("Comparar con Archivo")
@@ -1216,8 +1254,9 @@ def mostrar_sincronizacion():
                 else:
                     st.success("✅ Ambas bases de datos están completamente sincronizadas")
 
-            except Exception as e:
-                st.error(f"❌ Error al comparar: {e}")
+            except Exception:
+                # logger.error(f"Error al comparar archivos")
+                st.error("❌ No se pudo comparar el archivo. Verifica que sea un JSON válido exportado desde esta aplicación.")
 
 def mostrar_configuracion():
     st.title("⚙️ Configuración")

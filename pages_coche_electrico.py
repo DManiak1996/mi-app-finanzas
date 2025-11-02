@@ -30,8 +30,20 @@ def mostrar_registrar_recarga():
     """Formulario para registrar una nueva recarga del coche."""
     st.subheader("⚡ Nueva Recarga")
 
-    # Obtener última recarga para pre-rellenar algunos campos
+    # Obtener última recarga para pre-rellenar campos (Smart Defaults)
     ultima_recarga = db_manager.obtener_ultima_recarga()
+
+    # Valores por defecto basados en la última recarga
+    default_bateria_final = 80.0
+    default_potencia = 4.6
+    default_franja = "valle"
+    default_consumo = 16.0
+
+    if ultima_recarga:
+        default_bateria_final = ultima_recarga.get('bateria_final', 80.0)
+        default_potencia = 4.6  # La potencia no se guarda, usar default
+        default_franja = ultima_recarga.get('franja_horaria', 'valle')
+        default_consumo = ultima_recarga.get('consumo_medio', 16.0)
 
     with st.form("form_recarga", clear_on_submit=False):
         col1, col2 = st.columns(2)
@@ -51,7 +63,7 @@ def mostrar_registrar_recarga():
                 "% Batería final",
                 min_value=0.0,
                 max_value=100.0,
-                value=80.0,
+                value=default_bateria_final,
                 step=1.0,
                 help="Porcentaje de batería al finalizar la recarga"
             )
@@ -67,7 +79,7 @@ def mostrar_registrar_recarga():
                 "Potencia de recarga (kW)",
                 min_value=1.0,
                 max_value=350.0,
-                value=4.6,
+                value=default_potencia,
                 step=0.1,
                 help="Potencia del cargador (4.6 kW casa, 7.4 kW wallbox, 11+ kW público)"
             )
@@ -76,10 +88,14 @@ def mostrar_registrar_recarga():
             horas_recarga = coche_electrico.calcular_tiempo_recarga(kwh_cargados, potencia_recarga)
             st.metric("Tiempo estimado", f"{horas_recarga:.1f} horas", help="Calculado automáticamente")
 
+            # Índice por defecto según última franja
+            franjas_opciones = ["valle", "llano", "punta"]
+            indice_franja = franjas_opciones.index(default_franja) if default_franja in franjas_opciones else 0
+
             franja_horaria = st.selectbox(
                 "Franja horaria",
-                options=["valle", "llano", "punta"],
-                index=0,
+                options=franjas_opciones,
+                index=indice_franja,
                 help="Valle: noche/madrugada (más barata)"
             )
 
@@ -104,7 +120,7 @@ def mostrar_registrar_recarga():
             consumo_medio = st.number_input(
                 "Consumo medio (kWh/100km)",
                 min_value=0.0,
-                value=16.0,
+                value=default_consumo,
                 step=0.1,
                 help="Consumo mostrado en el ordenador de a bordo"
             )
@@ -317,13 +333,35 @@ def mostrar_registrar_recarga():
             )
 
         with col_btn3:
-            if st.button("🗑️ Eliminar", type="secondary", use_container_width=False):
-                id_eliminar = recargas_recientes[recarga_a_eliminar]['id']
-                if db_manager.eliminar_recarga_coche(id_eliminar):
-                    st.success("✅ Recarga eliminada correctamente")
+            # Sistema de confirmación con session_state
+            if 'confirmar_eliminacion' not in st.session_state:
+                st.session_state.confirmar_eliminacion = False
+
+            if not st.session_state.confirmar_eliminacion:
+                if st.button("🗑️ Eliminar", type="secondary", use_container_width=False, key="btn_eliminar_inicial"):
+                    st.session_state.confirmar_eliminacion = True
                     st.rerun()
-                else:
-                    st.error("❌ Error al eliminar la recarga")
+            else:
+                # Mostrar confirmación
+                recarga_seleccionada = recargas_recientes[recarga_a_eliminar]
+                st.warning(f"⚠️ ¿Eliminar recarga del {recarga_seleccionada['fecha_recarga'][:10]}? ({recarga_seleccionada['kwh_cargados']:.1f} kWh - {recarga_seleccionada['coste_total']:.2f}€)")
+
+                col_conf1, col_conf2 = st.columns(2)
+                with col_conf1:
+                    if st.button("❌ Cancelar", use_container_width=True, key="btn_cancelar_elim"):
+                        st.session_state.confirmar_eliminacion = False
+                        st.rerun()
+
+                with col_conf2:
+                    if st.button("✅ Sí, eliminar", type="primary", use_container_width=True, key="btn_confirmar_elim"):
+                        id_eliminar = recarga_seleccionada['id']
+                        if db_manager.eliminar_recarga_coche(id_eliminar):
+                            st.success("✅ Recarga eliminada correctamente")
+                            st.session_state.confirmar_eliminacion = False
+                            st.rerun()
+                        else:
+                            st.error("❌ Error al eliminar la recarga")
+                            st.session_state.confirmar_eliminacion = False
 
         # Sección para PAGAR recargas pendientes del mes
         st.markdown("---")
@@ -630,21 +668,18 @@ def mostrar_estadisticas_coche():
 
         st.markdown(f"### 📅 {datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}")
 
-        col1, col2, col3, col4 = st.columns(4)
+        # Layout responsive (2x2 con 2 métricas por columna)
+        col1, col2 = st.columns(2)
 
         with col1:
             st.metric("Recargas", stats_mes['total_recargas'])
             st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}")
+            st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
+            st.metric("Coste/km", f"{stats_mes['coste_por_km']:.4f} €")
 
         with col2:
             st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
             st.metric("Consumo Medio", f"{stats_mes['consumo_medio']:.1f} kWh/100km")
-
-        with col3:
-            st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
-            st.metric("Coste/km", f"{stats_mes['coste_por_km']:.4f} €")
-
-        with col4:
             st.metric("Días entre recargas", f"{stats_mes['dias_promedio_entre_recargas']:.1f}")
             st.metric("Km/recarga", f"{stats_mes['km_promedio_por_recarga']:.0f}")
 
