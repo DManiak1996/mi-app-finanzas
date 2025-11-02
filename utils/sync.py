@@ -10,17 +10,20 @@ def exportar_base_datos() -> Dict:
     Exporta toda la base de datos a un diccionario JSON.
 
     Returns:
-        Dict con metadata y todas las transacciones
+        Dict con metadata, transacciones y recargas de coche
     """
     transacciones = db_manager.obtener_transacciones()
+    recargas = db_manager.obtener_recargas()  # Obtener todas las recargas
 
     export_data = {
         "metadata": {
             "exported_at": datetime.datetime.now().isoformat(),
             "total_transactions": len(transacciones),
-            "version": "1.0"
+            "total_recargas": len(recargas),
+            "version": "2.0"  # Incrementar versión
         },
-        "transacciones": transacciones
+        "transacciones": transacciones,
+        "recargas_coche": recargas
     }
 
     return export_data
@@ -133,6 +136,85 @@ def importar_base_datos(data: Dict, modo: str = "fusionar") -> Dict:
             conn.close()
     else:
         conn.close()
+
+    # ========== IMPORTAR RECARGAS DE COCHE ==========
+    recargas_importar = data.get("recargas_coche", [])
+
+    if recargas_importar:
+        stats["total_recargas"] = len(recargas_importar)
+        stats["nuevas_recargas"] = 0
+        stats["duplicadas_recargas"] = 0
+        stats["errores_recargas"] = 0
+
+        # Conectar a BD para recargas
+        conn_recargas = db_manager.get_db_connection()
+        cursor_recargas = conn_recargas.cursor()
+
+        try:
+            # Obtener IDs de recargas existentes
+            cursor_recargas.execute("SELECT id FROM recargas_coche")
+            ids_recargas_existentes = {row['id'] for row in cursor_recargas.fetchall()}
+
+            # Preparar recargas para inserción
+            recargas_a_insertar = []
+
+            for recarga in recargas_importar:
+                if recarga['id'] in ids_recargas_existentes:
+                    stats["duplicadas_recargas"] += 1
+                    continue
+
+                recargas_a_insertar.append(recarga)
+                stats["nuevas_recargas"] += 1
+
+            # Inserción en lote de recargas
+            if recargas_a_insertar:
+                valores_recargas = [
+                    (
+                        r['id'],
+                        r['fecha_recarga'],
+                        r.get('bateria_inicial', 20),
+                        r.get('bateria_final', 80),
+                        r['kwh_cargados'],
+                        r.get('km_recorridos', 0),
+                        r.get('consumo_medio', 0),
+                        r['franja_horaria'],
+                        r['tarifa_kwh'],
+                        r.get('coste_energia', 0),
+                        r.get('coste_potencia', 0),
+                        r.get('coste_alquiler', 0),
+                        r.get('coste_bono', 0),
+                        r.get('coste_servicios', 0),
+                        r.get('impuesto_electricidad', 0),
+                        r.get('iva', 0),
+                        r['coste_total'],
+                        r['mes'],
+                        r['año'],
+                        r.get('transaccion_id'),
+                        r.get('categoria', 'FIJOS'),
+                        r.get('notas', '')
+                    )
+                    for r in recargas_a_insertar
+                ]
+
+                cursor_recargas.executemany("""
+                    INSERT INTO recargas_coche (
+                        id, fecha_recarga, bateria_inicial, bateria_final, kwh_cargados,
+                        km_recorridos, consumo_medio, franja_horaria, tarifa_kwh,
+                        coste_energia, coste_potencia, coste_alquiler, coste_bono, coste_servicios,
+                        impuesto_electricidad, iva, coste_total,
+                        mes, año, transaccion_id, categoria, notas
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, valores_recargas)
+
+                conn_recargas.commit()
+
+        except Exception as e:
+            print(f"Error al importar recargas: {e}")
+            conn_recargas.rollback()
+            stats["errores_recargas"] = len(recargas_a_insertar)
+            stats["nuevas_recargas"] = 0
+        finally:
+            conn_recargas.close()
 
     return stats
 

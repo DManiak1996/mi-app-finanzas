@@ -1113,12 +1113,22 @@ def mostrar_sincronizacion():
 
                         st.success("✅ Importación completada")
 
+                        # Estadísticas de transacciones
+                        st.markdown("### 📋 Transacciones")
                         col1, col2, col3 = st.columns(3)
                         col1.metric("Nuevas", stats['nuevas'], delta=f"+{stats['nuevas']}")
                         col2.metric("Duplicadas (omitidas)", stats['duplicadas'])
                         col3.metric("Errores", stats['errores'], delta_color="inverse")
 
-                        if stats['nuevas'] > 0:
+                        # Estadísticas de recargas (si las hay)
+                        if 'total_recargas' in stats and stats['total_recargas'] > 0:
+                            st.markdown("### 🔌 Recargas de Coche")
+                            col4, col5, col6 = st.columns(3)
+                            col4.metric("Nuevas recargas", stats.get('nuevas_recargas', 0), delta=f"+{stats.get('nuevas_recargas', 0)}")
+                            col5.metric("Duplicadas", stats.get('duplicadas_recargas', 0))
+                            col6.metric("Errores", stats.get('errores_recargas', 0), delta_color="inverse")
+
+                        if stats['nuevas'] > 0 or stats.get('nuevas_recargas', 0) > 0:
                             st.balloons()
 
                         st.info("💡 Refresca la página para ver los datos actualizados")
