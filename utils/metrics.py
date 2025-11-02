@@ -91,9 +91,17 @@ def calcular_evolucion_mensual():
 
 def calcular_liquido_disponible():
     """
-    Obtiene el balance total acumulado de la base de datos.
+    Calcula el líquido disponible total.
+
+    Returns:
+        Saldo inicial + suma de todas las transacciones
     """
-    return db_manager.obtener_ultimo_saldo()
+    from utils import config_manager
+
+    saldo_inicial = config_manager.obtener_saldo_inicial()
+    suma_transacciones = db_manager.obtener_ultimo_saldo()
+
+    return saldo_inicial + suma_transacciones
 
 
 # ========== MÉTRICAS FINANCIERAS AVANZADAS ==========

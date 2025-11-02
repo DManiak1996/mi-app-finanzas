@@ -20,6 +20,12 @@
       "tipo": "INGRESO"
     },
     {
+      "_descripcion": "FIJOS: Recarga coche eléctrico",
+      "patron": "Recarga coche eléctrico|COCHE_ELECTRICO",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
+    },
+    {
       "_descripcion": "FIJOS: Gimnasio",
       "patron": "RBO VIVAGYM|RBO ALTAFIT|VIVAGYM|ALTAFIT",
       "categoria": "FIJOS",

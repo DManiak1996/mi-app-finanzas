@@ -1,0 +1,684 @@
+# pages_coche_electrico.py
+# Páginas y funciones para el módulo de Coche Eléctrico
+
+import streamlit as st
+import datetime
+import pandas as pd
+import plotly.graph_objects as go
+from database import db_manager
+from utils import coche_electrico
+
+
+def mostrar_coche_electrico():
+    """Página principal del Coche Eléctrico con sub-pestañas."""
+    st.title("🔌 Coche Eléctrico - VW ID.3 Pro S")
+
+    # Sub-pestañas
+    tab1, tab2, tab3 = st.tabs(["⚡ Registrar Recarga", "💡 Registrar Factura Luz", "📊 Estadísticas"])
+
+    with tab1:
+        mostrar_registrar_recarga()
+
+    with tab2:
+        mostrar_registrar_factura_luz()
+
+    with tab3:
+        mostrar_estadisticas_coche()
+
+
+def mostrar_registrar_recarga():
+    """Formulario para registrar una nueva recarga del coche."""
+    st.subheader("⚡ Nueva Recarga")
+
+    # Obtener última recarga para pre-rellenar algunos campos
+    ultima_recarga = db_manager.obtener_ultima_recarga()
+
+    with st.form("form_recarga", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("#### 🔋 Batería")
+            bateria_inicial = st.number_input(
+                "% Batería inicial",
+                min_value=0.0,
+                max_value=100.0,
+                value=20.0,
+                step=1.0,
+                help="Porcentaje de batería al iniciar la recarga"
+            )
+
+            bateria_final = st.number_input(
+                "% Batería final",
+                min_value=0.0,
+                max_value=100.0,
+                value=80.0,
+                step=1.0,
+                help="Porcentaje de batería al finalizar la recarga"
+            )
+
+            # Cálculo automático de kWh
+            kwh_cargados = coche_electrico.calcular_kwh_cargados(bateria_inicial, bateria_final)
+            st.metric("kWh cargados", f"{kwh_cargados:.2f} kWh", help="Calculado automáticamente")
+
+        with col2:
+            st.markdown("#### ⚡ Recarga")
+
+            potencia_recarga = st.number_input(
+                "Potencia de recarga (kW)",
+                min_value=1.0,
+                max_value=350.0,
+                value=4.6,
+                step=0.1,
+                help="Potencia del cargador (4.6 kW casa, 7.4 kW wallbox, 11+ kW público)"
+            )
+
+            # Cálculo automático de tiempo
+            horas_recarga = coche_electrico.calcular_tiempo_recarga(kwh_cargados, potencia_recarga)
+            st.metric("Tiempo estimado", f"{horas_recarga:.1f} horas", help="Calculado automáticamente")
+
+            franja_horaria = st.selectbox(
+                "Franja horaria",
+                options=["valle", "llano", "punta"],
+                index=0,
+                help="Valle: noche/madrugada (más barata)"
+            )
+
+        st.markdown("---")
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.markdown("#### 🚗 Conducción")
+            fecha_recarga = st.date_input(
+                "Fecha de recarga",
+                value=datetime.date.today()
+            )
+
+            km_recorridos = st.number_input(
+                "Km recorridos desde última recarga",
+                min_value=0.0,
+                value=0.0,
+                step=1.0
+            )
+
+            consumo_medio = st.number_input(
+                "Consumo medio (kWh/100km)",
+                min_value=0.0,
+                value=16.0,
+                step=0.1,
+                help="Consumo mostrado en el ordenador de a bordo"
+            )
+
+        with col4:
+            st.markdown("#### 💰 Coste Calculado")
+
+            # Calcular coste completo
+            costes = coche_electrico.calcular_coste_recarga(
+                kwh_cargados,
+                franja_horaria,
+                horas_recarga
+            )
+
+            st.metric("Energía", f"{costes['coste_energia']:.2f} €")
+            st.metric("Costes fijos", f"{costes['coste_potencia'] + costes['coste_alquiler'] + costes['coste_bono'] + costes['coste_servicios']:.2f} €")
+            st.metric("Impuestos", f"{costes['impuesto_electricidad'] + costes['iva']:.2f} €")
+            st.metric("💵 TOTAL", f"{costes['coste_total']:.2f} €",
+                     delta=None,
+                     help="Coste total de esta recarga")
+
+        st.markdown("---")
+
+        notas = st.text_input(
+            "Notas (opcional)",
+            placeholder="Ej: Recarga en casa, Recarga rápida en autopista...",
+            help="Información adicional sobre esta recarga"
+        )
+
+        # Botón de submit
+        submitted = st.form_submit_button("💾 Guardar Recarga", type="primary", use_container_width=True)
+
+        if submitted:
+            # Validaciones
+            if bateria_final <= bateria_inicial:
+                st.error("❌ La batería final debe ser mayor que la inicial")
+            elif kwh_cargados <= 0:
+                st.error("❌ Los kWh cargados deben ser positivos")
+            else:
+                # Guardar en BD
+                mes = fecha_recarga.month
+                año = fecha_recarga.year
+
+                resultado = db_manager.insertar_recarga_coche(
+                    fecha_recarga=fecha_recarga,
+                    bateria_inicial=bateria_inicial,
+                    bateria_final=bateria_final,
+                    kwh_cargados=kwh_cargados,
+                    km_recorridos=km_recorridos,
+                    consumo_medio=consumo_medio,
+                    franja_horaria=franja_horaria,
+                    tarifa_kwh=costes['tarifa_kwh'],
+                    coste_energia=costes['coste_energia'],
+                    coste_potencia=costes['coste_potencia'],
+                    coste_alquiler=costes['coste_alquiler'],
+                    coste_bono=costes['coste_bono'],
+                    coste_servicios=costes['coste_servicios'],
+                    impuesto_electricidad=costes['impuesto_electricidad'],
+                    iva=costes['iva'],
+                    coste_total=costes['coste_total'],
+                    mes=mes,
+                    año=año,
+                    notas=notas
+                )
+
+                if resultado:
+                    st.success(f"✅ Recarga guardada correctamente - Total: {costes['coste_total']:.2f} €")
+                    st.balloons()
+
+                    # Mostrar análisis de la recarga
+                    if ultima_recarga:
+                        dias_desde_ultima = coche_electrico.calcular_dias_desde_ultima_recarga(
+                            fecha_recarga,
+                            datetime.datetime.fromisoformat(ultima_recarga['fecha_recarga']).date()
+                        )
+                        st.info(f"📅 Días desde última recarga: {dias_desde_ultima}")
+
+                        if km_recorridos > 0 and dias_desde_ultima > 0:
+                            km_diarios = coche_electrico.calcular_km_diarios(km_recorridos, dias_desde_ultima)
+                            st.info(f"🚗 Promedio: {km_diarios:.1f} km/día")
+                else:
+                    st.error("❌ Error al guardar la recarga. Inténtalo de nuevo.")
+
+    # Mostrar últimas 10 recargas con opción de editar/eliminar
+    st.markdown("---")
+    st.subheader("📝 Últimas Recargas")
+
+    recargas_recientes = db_manager.obtener_recargas(limit=10)
+
+    if recargas_recientes:
+        # Preparar DataFrame con todos los campos necesarios
+        df_recargas = pd.DataFrame(recargas_recientes)
+
+        # Mostrar tabla editable
+        columnas_display = ['id', 'fecha_recarga', 'bateria_inicial', 'bateria_final', 'kwh_cargados',
+                           'km_recorridos', 'consumo_medio', 'franja_horaria', 'coste_total']
+
+        df_editable = df_recargas[columnas_display].copy()
+        # Convertir fecha a datetime para poder usar DateColumn
+        df_editable['fecha_recarga'] = pd.to_datetime(df_editable['fecha_recarga'])
+
+        # Renombrar columnas para mejor visualización
+        df_editable = df_editable.rename(columns={
+            'id': 'ID',
+            'fecha_recarga': 'Fecha',
+            'bateria_inicial': 'Bat. Inicial %',
+            'bateria_final': 'Bat. Final %',
+            'kwh_cargados': 'kWh',
+            'km_recorridos': 'Km',
+            'consumo_medio': 'kWh/100km',
+            'franja_horaria': 'Franja',
+            'coste_total': 'Coste €'
+        })
+
+        # Editor de datos con configuración de columnas
+        edited_df = st.data_editor(
+            df_editable,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            disabled=['ID', 'kWh', 'Coste €'],  # Campos calculados no editables
+            column_config={
+                "ID": st.column_config.TextColumn("ID", width="small", disabled=True),
+                "Fecha": st.column_config.DateColumn("Fecha", format="DD/MM/YYYY"),
+                "Bat. Inicial %": st.column_config.NumberColumn("Bat. Inicial %", min_value=0, max_value=100, step=1),
+                "Bat. Final %": st.column_config.NumberColumn("Bat. Final %", min_value=0, max_value=100, step=1),
+                "kWh": st.column_config.NumberColumn("kWh", format="%.2f", disabled=True),
+                "Km": st.column_config.NumberColumn("Km", min_value=0, step=1),
+                "kWh/100km": st.column_config.NumberColumn("kWh/100km", min_value=0, step=0.1, format="%.1f"),
+                "Franja": st.column_config.SelectboxColumn("Franja", options=["valle", "llano", "punta"]),
+                "Coste €": st.column_config.NumberColumn("Coste €", format="%.2f €", disabled=True)
+            }
+        )
+
+        # Botones de acción
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 4])
+
+        with col_btn1:
+            if st.button("💾 Guardar Cambios", type="primary", use_container_width=True):
+                # Comparar DataFrames para detectar cambios
+                cambios_detectados = False
+
+                for idx in range(len(df_editable)):
+                    id_recarga = edited_df.iloc[idx]['ID']
+
+                    # Verificar si hay cambios en esta fila
+                    for col_orig, col_edit in [
+                        ('Fecha', 'Fecha'),
+                        ('Bat. Inicial %', 'Bat. Inicial %'),
+                        ('Bat. Final %', 'Bat. Final %'),
+                        ('Km', 'Km'),
+                        ('kWh/100km', 'kWh/100km'),
+                        ('Franja', 'Franja')
+                    ]:
+                        if df_editable.iloc[idx][col_orig] != edited_df.iloc[idx][col_edit]:
+                            cambios_detectados = True
+
+                            # Recalcular kWh y costes si cambió batería o franja
+                            bat_inicial = edited_df.iloc[idx]['Bat. Inicial %']
+                            bat_final = edited_df.iloc[idx]['Bat. Final %']
+                            kwh = coche_electrico.calcular_kwh_cargados(bat_inicial, bat_final)
+
+                            # Obtener potencia de recarga de la BD (o usar default 4.6)
+                            recarga_original = db_manager.obtener_recarga_por_id(id_recarga)
+                            potencia = 4.6  # Default
+                            horas = coche_electrico.calcular_tiempo_recarga(kwh, potencia)
+
+                            franja = edited_df.iloc[idx]['Franja']
+                            costes = coche_electrico.calcular_coste_recarga(kwh, franja, horas)
+
+                            # Actualizar en BD
+                            campos_actualizar = {
+                                'fecha_recarga': edited_df.iloc[idx]['Fecha'],
+                                'bateria_inicial': bat_inicial,
+                                'bateria_final': bat_final,
+                                'kwh_cargados': kwh,
+                                'km_recorridos': edited_df.iloc[idx]['Km'],
+                                'consumo_medio': edited_df.iloc[idx]['kWh/100km'],
+                                'franja_horaria': franja,
+                                'tarifa_kwh': costes['tarifa_kwh'],
+                                'coste_energia': costes['coste_energia'],
+                                'coste_potencia': costes['coste_potencia'],
+                                'coste_alquiler': costes['coste_alquiler'],
+                                'coste_bono': costes['coste_bono'],
+                                'coste_servicios': costes['coste_servicios'],
+                                'impuesto_electricidad': costes['impuesto_electricidad'],
+                                'iva': costes['iva'],
+                                'coste_total': costes['coste_total']
+                            }
+
+                            if db_manager.actualizar_recarga_coche(id_recarga, **campos_actualizar):
+                                st.success(f"✅ Recarga {id_recarga[:8]}... actualizada")
+                            else:
+                                st.error(f"❌ Error al actualizar recarga {id_recarga[:8]}...")
+                            break
+
+                if cambios_detectados:
+                    st.rerun()
+                else:
+                    st.info("ℹ️ No se detectaron cambios")
+
+        with col_btn2:
+            # Selector de recarga a eliminar
+            opciones_eliminar = [f"{r['fecha_recarga'][:10]} - {r['kwh_cargados']:.1f} kWh" for r in recargas_recientes]
+            recarga_a_eliminar = st.selectbox(
+                "Eliminar recarga:",
+                options=range(len(recargas_recientes)),
+                format_func=lambda x: opciones_eliminar[x],
+                label_visibility="collapsed"
+            )
+
+        with col_btn3:
+            if st.button("🗑️ Eliminar", type="secondary", use_container_width=False):
+                id_eliminar = recargas_recientes[recarga_a_eliminar]['id']
+                if db_manager.eliminar_recarga_coche(id_eliminar):
+                    st.success("✅ Recarga eliminada correctamente")
+                    st.rerun()
+                else:
+                    st.error("❌ Error al eliminar la recarga")
+    else:
+        st.info("No hay recargas registradas aún.")
+
+
+def mostrar_registrar_factura_luz():
+    """Formulario para registrar la factura mensual de electricidad."""
+    st.subheader("💡 Nueva Factura de Electricidad")
+
+    with st.form("form_factura", clear_on_submit=False):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("#### 📅 Período")
+
+            mes = st.selectbox(
+                "Mes",
+                options=list(range(1, 13)),
+                format_func=lambda x: datetime.date(2000, x, 1).strftime('%B'),
+                index=datetime.date.today().month - 1
+            )
+
+            año = st.number_input(
+                "Año",
+                min_value=2020,
+                max_value=2030,
+                value=datetime.date.today().year,
+                step=1
+            )
+
+            fecha_factura = st.date_input(
+                "Fecha de la factura",
+                value=datetime.date.today()
+            )
+
+        with col2:
+            st.markdown("#### ⚡ Consumos (kWh)")
+
+            consumo_punta = st.number_input(
+                "Punta",
+                min_value=0.0,
+                value=110.44,
+                step=0.01,
+                help="kWh consumidos en franja punta"
+            )
+
+            consumo_llano = st.number_input(
+                "Llano",
+                min_value=0.0,
+                value=55.80,
+                step=0.01,
+                help="kWh consumidos en franja llano"
+            )
+
+            consumo_valle = st.number_input(
+                "Valle",
+                min_value=0.0,
+                value=142.34,
+                step=0.01,
+                help="kWh consumidos en franja valle"
+            )
+
+        st.markdown("---")
+        st.markdown("#### 💰 Costes Fijos Mensuales (€)")
+
+        col3, col4, col5 = st.columns(3)
+
+        with col3:
+            potencia = st.number_input(
+                "Potencia",
+                min_value=0.0,
+                value=13.71,
+                step=0.01
+            )
+
+            alquiler = st.number_input(
+                "Alquiler contador",
+                min_value=0.0,
+                value=0.80,
+                step=0.01
+            )
+
+        with col4:
+            bono_social = st.number_input(
+                "Bono social",
+                min_value=0.0,
+                value=0.38,
+                step=0.01
+            )
+
+            servicios = st.number_input(
+                "Servicios",
+                min_value=0.0,
+                value=4.69,
+                step=0.01
+            )
+
+        with col5:
+            excedentes_kwh = st.number_input(
+                "Excedentes (kWh)",
+                min_value=0.0,
+                value=0.0,
+                step=0.01,
+                help="kWh exportados a la red (paneles solares)"
+            )
+
+            excedentes_comp = st.number_input(
+                "Compensación (€)",
+                min_value=0.0,
+                value=0.0,
+                step=0.01,
+                help="Euros de compensación por excedentes"
+            )
+
+        notas_factura = st.text_area(
+            "Notas (opcional)",
+            placeholder="Información adicional sobre esta factura..."
+        )
+
+        submitted = st.form_submit_button("💾 Guardar Factura", type="primary", use_container_width=True)
+
+        if submitted:
+            # Tarifas fijas
+            tarifa_punta = 0.184576
+            tarifa_llano = 0.131892
+            tarifa_valle = 0.099904
+
+            resultado = db_manager.insertar_factura_electricidad(
+                mes=mes,
+                año=año,
+                fecha_factura=fecha_factura,
+                consumo_punta_kwh=consumo_punta,
+                consumo_llano_kwh=consumo_llano,
+                consumo_valle_kwh=consumo_valle,
+                tarifa_punta=tarifa_punta,
+                tarifa_llano=tarifa_llano,
+                tarifa_valle=tarifa_valle,
+                potencia=potencia,
+                alquiler_contador=alquiler,
+                bono_social=bono_social,
+                servicios=servicios,
+                excedentes_kwh=excedentes_kwh,
+                excedentes_compensacion=excedentes_comp,
+                notas=notas_factura
+            )
+
+            if resultado:
+                # Obtener la factura recién insertada para mostrar resultados
+                factura = db_manager.obtener_factura_por_mes(mes, año)
+
+                st.success(f"✅ Factura guardada correctamente")
+                st.balloons()
+
+                # Mostrar resumen
+                col_r1, col_r2, col_r3 = st.columns(3)
+
+                with col_r1:
+                    st.metric("Total Factura", f"{factura['total_factura']:.2f} €")
+
+                with col_r2:
+                    st.metric("Consumo Total", f"{factura['consumo_total_kwh']:.1f} kWh")
+
+                with col_r3:
+                    if factura['porcentaje_coche'] > 0:
+                        st.metric("Participación Coche", f"{factura['porcentaje_coche']:.1f} %",
+                                 delta=f"{factura['coste_coche_mes']:.2f} €")
+
+                # Mostrar desglose
+                with st.expander("📋 Ver Desglose Completo"):
+                    st.write("**Energía por franja:**")
+                    st.write(f"- Punta: {consumo_punta} kWh × {tarifa_punta} €/kWh = {consumo_punta * tarifa_punta:.2f} €")
+                    st.write(f"- Llano: {consumo_llano} kWh × {tarifa_llano} €/kWh = {consumo_llano * tarifa_llano:.2f} €")
+                    st.write(f"- Valle: {consumo_valle} kWh × {tarifa_valle} €/kWh = {consumo_valle * tarifa_valle:.2f} €")
+                    st.write(f"**Coste energía total: {factura['coste_energia']:.2f} €**")
+                    st.write("")
+                    st.write(f"**Costes fijos:** {potencia + alquiler + bono_social + servicios:.2f} €")
+                    st.write(f"**Impuesto electricidad:** {factura['impuesto_electricidad']:.2f} €")
+                    st.write(f"**IVA:** {factura['iva']:.2f} €")
+                    st.write("")
+                    st.write(f"### TOTAL: {factura['total_factura']:.2f} €")
+            else:
+                st.error("❌ Error al guardar la factura. Puede que ya exista una factura para este mes/año.")
+
+    # Mostrar últimas facturas
+    st.markdown("---")
+    st.subheader("📝 Últimas Facturas")
+
+    facturas_recientes = db_manager.obtener_facturas_electricidad(limit=6)
+
+    if facturas_recientes:
+        df_facturas = pd.DataFrame(facturas_recientes)
+
+        # Crear columna de periodo
+        df_facturas['periodo'] = df_facturas.apply(
+            lambda row: f"{datetime.date(2000, row['mes'], 1).strftime('%B')} {row['año']}",
+            axis=1
+        )
+
+        columnas_mostrar = {
+            'periodo': 'Período',
+            'consumo_total_kwh': 'kWh Total',
+            'kwh_coche_mes': 'kWh Coche',
+            'porcentaje_coche': '% Coche',
+            'total_factura': 'Total €'
+        }
+
+        df_display = df_facturas[list(columnas_mostrar.keys())].rename(columns=columnas_mostrar)
+        df_display['Total €'] = df_display['Total €'].apply(lambda x: f"{x:.2f} €")
+        df_display['% Coche'] = df_display['% Coche'].apply(lambda x: f"{x:.1f}%")
+
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+    else:
+        st.info("No hay facturas registradas aún.")
+
+
+def mostrar_estadisticas_coche():
+    """Dashboard con estadísticas y gráficos del coche eléctrico."""
+    st.subheader("📊 Estadísticas del Coche Eléctrico")
+
+    # Selector de período
+    col_sel1, col_sel2 = st.columns(2)
+
+    with col_sel1:
+        año_seleccionado = st.selectbox(
+            "Año",
+            options=list(range(datetime.date.today().year, 2019, -1)),
+            index=0
+        )
+
+    with col_sel2:
+        mes_seleccionado = st.selectbox(
+            "Mes (para detalles)",
+            options=list(range(1, 13)),
+            format_func=lambda x: datetime.date(2000, x, 1).strftime('%B'),
+            index=datetime.date.today().month - 1
+        )
+
+    # Obtener datos
+    recargas_mes = db_manager.obtener_recargas(mes=mes_seleccionado, año=año_seleccionado)
+    recargas_año = db_manager.obtener_recargas(año=año_seleccionado)
+
+    if not recargas_mes and not recargas_año:
+        st.warning("No hay datos de recargas para mostrar. Registra tu primera recarga para ver estadísticas.")
+        return
+
+    # Estadísticas del mes
+    if recargas_mes:
+        stats_mes = coche_electrico.calcular_estadisticas_mes(recargas_mes)
+
+        st.markdown(f"### 📅 {datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("Recargas", stats_mes['total_recargas'])
+            st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}")
+
+        with col2:
+            st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
+            st.metric("Consumo Medio", f"{stats_mes['consumo_medio']:.1f} kWh/100km")
+
+        with col3:
+            st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
+            st.metric("Coste/km", f"{stats_mes['coste_por_km']:.4f} €")
+
+        with col4:
+            st.metric("Días entre recargas", f"{stats_mes['dias_promedio_entre_recargas']:.1f}")
+            st.metric("Km/recarga", f"{stats_mes['km_promedio_por_recarga']:.0f}")
+
+        # Comparativa gasolina
+        if stats_mes['km_totales'] > 0:
+            ahorro_vs_gasolina = coche_electrico.calcular_ahorro_vs_gasolina(
+                stats_mes['km_totales'],
+                stats_mes['coste_total']
+            )
+
+            st.markdown("---")
+            st.markdown("### 💰 Comparativa con Gasolina")
+
+            col_g1, col_g2, col_g3 = st.columns(3)
+
+            with col_g1:
+                st.metric("Coste Gasolina", f"{ahorro_vs_gasolina['coste_gasolina']:.2f} €")
+
+            with col_g2:
+                st.metric("Ahorro Mensual", f"{ahorro_vs_gasolina['ahorro']:.2f} €",
+                         delta=f"-{ahorro_vs_gasolina['porcentaje_ahorro']:.1f}%")
+
+            with col_g3:
+                ahorro_anual = ahorro_vs_gasolina['ahorro'] * 12
+                st.metric("Ahorro Anual Estimado", f"{ahorro_anual:.2f} €")
+
+    else:
+        st.info(f"No hay recargas en {datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}")
+
+    # Gráficos del año
+    if recargas_año:
+        st.markdown("---")
+        st.markdown(f"### 📈 Evolución Anual {año_seleccionado}")
+
+        # Preparar datos para gráficos
+        df_año = pd.DataFrame(recargas_año)
+        df_año['fecha_recarga'] = pd.to_datetime(df_año['fecha_recarga'])
+        df_año = df_año.sort_values('fecha_recarga')
+
+        # Gráfico 1: Evolución kWh y Coste
+        col_g1, col_g2 = st.columns(2)
+
+        with col_g1:
+            st.markdown("#### kWh por Recarga")
+            fig_kwh = go.Figure()
+            fig_kwh.add_trace(go.Bar(
+                x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
+                y=df_año['kwh_cargados'],
+                name='kWh',
+                marker_color='lightblue'
+            ))
+            fig_kwh.update_layout(height=300, showlegend=False)
+            st.plotly_chart(fig_kwh, use_container_width=True)
+
+        with col_g2:
+            st.markdown("#### Coste por Recarga")
+            fig_coste = go.Figure()
+            fig_coste.add_trace(go.Bar(
+                x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
+                y=df_año['coste_total'],
+                name='Coste €',
+                marker_color='lightgreen'
+            ))
+            fig_coste.update_layout(height=300, showlegend=False)
+            st.plotly_chart(fig_coste, use_container_width=True)
+
+        # Gráfico 2: Distribución por franja
+        st.markdown("#### Distribución por Franja Horaria")
+        distribucion_franjas = df_año['franja_horaria'].value_counts()
+
+        fig_franjas = go.Figure(data=[go.Pie(
+            labels=distribucion_franjas.index,
+            values=distribucion_franjas.values,
+            hole=.3
+        )])
+        fig_franjas.update_layout(height=400)
+        st.plotly_chart(fig_franjas, use_container_width=True)
+
+        # Tabla resumen por mes
+        st.markdown("#### Resumen Mensual")
+        df_año['mes_nombre'] = df_año['fecha_recarga'].dt.strftime('%B')
+        resumen_mensual = df_año.groupby('mes_nombre').agg({
+            'kwh_cargados': 'sum',
+            'km_recorridos': 'sum',
+            'coste_total': 'sum',
+            'consumo_medio': 'mean'
+        }).round(2)
+
+        resumen_mensual.columns = ['kWh Total', 'Km Total', 'Coste Total €', 'Consumo Medio']
+        st.dataframe(resumen_mensual, use_container_width=True)
+
+    else:
+        st.info(f"No hay recargas en {año_seleccionado}")

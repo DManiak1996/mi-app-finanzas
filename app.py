@@ -2,11 +2,13 @@
 
 import streamlit as st
 from database import db_manager
-from utils import metrics, visualizer, excel_reader, categorizer, sync
+from utils import metrics, visualizer, excel_reader, categorizer, sync, coche_electrico, config_manager
 import datetime
 import pandas as pd
 import json
-import auth  # Sistema de autenticación
+import sqlite3
+import plotly.graph_objects as go
+import auth_simple as auth  # Sistema de autenticación (sin cookies temporalmente)
 
 # --- Configuración de la página ---
 st.set_page_config(
@@ -29,9 +31,20 @@ inicializar_app()
 
 # --- Barra lateral de navegación ---
 st.sidebar.title("Navegación")
+
+# Sincronizar navegación por botón con radio
+PAGINAS = ["Dashboard", "Añadir Gasto", "Transacciones", "Importar", "Categorías", "🔌 Coche Eléctrico", "Sincronización", "Configuración"]
+
+if 'pagina_navegacion' in st.session_state:
+    indice_inicial = PAGINAS.index(st.session_state['pagina_navegacion'])
+    del st.session_state['pagina_navegacion']  # Limpiar después de usarlo
+else:
+    indice_inicial = 0
+
 pagina_seleccionada = st.sidebar.radio(
     "Elige una página:",
-    ["Dashboard", "Transacciones", "Importar", "Categorías", "Sincronización", "Configuración"]
+    PAGINAS,
+    index=indice_inicial
 )
 
 st.sidebar.markdown("---")
@@ -53,7 +66,7 @@ def mostrar_dashboard():
     st.title("📊 Dashboard Financiero")
 
     # --- Selectores de período en columnas ---
-    col_selector1, col_selector2, col_selector3 = st.columns([1, 1, 2])
+    col_selector1, col_selector2, col_selector3, col_selector4 = st.columns([1, 1, 2, 1])
 
     año_actual = datetime.date.today().year
     mes_actual = datetime.date.today().month
@@ -73,6 +86,13 @@ def mostrar_dashboard():
             value=f"{liquido_disponible:.2f} €",
             help="Balance acumulado de todas tus transacciones"
         )
+
+    with col_selector4:
+        # Botón para añadir gasto
+        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear con los selectores
+        if st.button("➕ Añadir Gasto", type="primary", use_container_width=True):
+            st.session_state['pagina_navegacion'] = "Añadir Gasto"
+            st.rerun()
 
     st.markdown("---")
 
@@ -130,7 +150,7 @@ def mostrar_dashboard():
                     st.markdown("### 📊 Distribución de Gastos")
                     fig = visualizer.grafico_distribucion_gastos(datos_mes['gastos_por_categoria'])
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="plot_gastos_mes")
                     else:
                         st.info("Sin datos de gastos")
 
@@ -183,8 +203,6 @@ def mostrar_dashboard():
                     df_completo = pd.concat([df_inicial, df_trans[['fecha', 'saldo_disponible']]], ignore_index=True)
 
                     # Crear gráfico de línea
-                    import plotly.graph_objects as go
-
                     fig = go.Figure()
 
                     # Preparar etiquetas de fecha para el eje X
@@ -232,7 +250,7 @@ def mostrar_dashboard():
                         )
                     )
 
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key="plot_evolucion_saldo_mes")
 
                     # Estadísticas del mes
                     col1, col2, col3, col4 = st.columns(4)
@@ -306,13 +324,13 @@ def mostrar_dashboard():
                         st.markdown("### 📈 Evolución Mensual")
                         fig = visualizer.grafico_evolucion_anual(datos_anuales['evolucion_mensual'], NOMBRES_MESES)
                         if fig:
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True, key="plot_evolucion_anual")
 
                     with col2:
                         st.markdown("### 📊 Distribución Anual")
                         fig = visualizer.grafico_distribucion_gastos(datos_anuales['gastos_por_categoria'])
                         if fig:
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True, key="plot_distribucion_anual")
                 else:
                     st.info(f"No hay datos para el año {año}")
 
@@ -559,7 +577,7 @@ def mostrar_dashboard():
         fig = visualizer.grafico_evolucion_mensual(df_evol)
 
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="plot_historico_mensual")
 
             # Estadísticas del histórico
             if not df_evol.empty:
@@ -572,6 +590,155 @@ def mostrar_dashboard():
                     col4.metric("📈 Promedio Balance/Mes", f"{df_evol['balance'].mean():.2f} €")
         else:
             st.info("No hay suficientes datos históricos")
+
+def mostrar_añadir_gasto():
+    """Página para añadir gastos individuales manualmente"""
+    st.title("➕ Añadir Nuevo Gasto")
+    st.markdown("Registra gastos individuales que no están en tu extracto bancario o que quieres anotar inmediatamente.")
+
+    # Formulario de añadir gasto
+    with st.form("form_nuevo_gasto", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fecha_gasto = st.date_input(
+                "📅 Fecha",
+                value=datetime.date.today(),
+                help="Fecha del gasto"
+            )
+
+            concepto = st.text_input(
+                "📝 Concepto",
+                placeholder="Ej: Café con amigos, Uber, etc.",
+                help="Descripción del gasto"
+            )
+
+        with col2:
+            importe = st.number_input(
+                "💶 Importe (€)",
+                min_value=0.01,
+                value=10.00,
+                step=0.01,
+                format="%.2f",
+                help="Cantidad gastada (siempre positiva, se guardará como negativa)"
+            )
+
+            categoria = st.selectbox(
+                "🏷️ Categoría",
+                ["DISFRUTE", "FIJOS", "EXTRAORDINARIOS"],
+                help="Tipo de gasto"
+            )
+
+        notas = st.text_area(
+            "📋 Notas (opcional)",
+            placeholder="Añade cualquier información adicional...",
+            height=80
+        )
+
+        # Botones
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 2])
+        with col_btn1:
+            submit = st.form_submit_button("💾 Guardar Gasto", use_container_width=True, type="primary")
+        with col_btn2:
+            clear = st.form_submit_button("🗑️ Limpiar", use_container_width=True)
+
+        if submit:
+            # Validaciones
+            if not concepto or concepto.strip() == "":
+                st.error("❌ El concepto no puede estar vacío")
+            elif importe <= 0:
+                st.error("❌ El importe debe ser mayor que 0")
+            else:
+                # Insertar en base de datos
+                try:
+                    # Convertir importe a negativo (es un gasto)
+                    importe_negativo = -abs(importe)
+
+                    # Generar ID único
+                    id_transaccion = db_manager.generar_uuid()
+
+                    # Insertar transacción
+                    db_manager.insertar_transaccion(
+                        id=id_transaccion,
+                        fecha=fecha_gasto,
+                        concepto=concepto.strip(),
+                        importe=importe_negativo,
+                        categoria=categoria,
+                        tipo='GASTO',
+                        mes=fecha_gasto.month,
+                        año=fecha_gasto.year,
+                        notas=notas.strip() if notas else None,
+                        saldo_posterior=None  # Se calculará al importar Excel
+                    )
+
+                    st.success(f"✅ Gasto guardado: {concepto} - {abs(importe_negativo):.2f}€")
+                    st.balloons()
+
+                    # Mostrar resumen
+                    with st.expander("📊 Ver resumen del gasto", expanded=True):
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Fecha", fecha_gasto.strftime("%d/%m/%Y"))
+                        col2.metric("Importe", f"{abs(importe_negativo):.2f} €")
+                        col3.metric("Categoría", categoria)
+
+                except Exception as e:
+                    st.error(f"❌ Error al guardar: {str(e)}")
+
+    # Separador
+    st.markdown("---")
+
+    # Últimos gastos añadidos manualmente
+    st.subheader("📝 Últimos gastos registrados")
+
+    try:
+        # Obtener últimos 10 gastos
+        conn = sqlite3.connect('finanzas.db')
+        query = """
+        SELECT fecha, concepto, importe, categoria
+        FROM transacciones
+        WHERE tipo = 'GASTO'
+        ORDER BY fecha DESC, id DESC
+        LIMIT 10
+        """
+        df_ultimos = pd.read_sql_query(query, conn)
+        conn.close()
+
+        if not df_ultimos.empty:
+            df_ultimos['importe'] = df_ultimos['importe'].abs()
+            df_ultimos.columns = ['Fecha', 'Concepto', 'Importe (€)', 'Categoría']
+
+            st.dataframe(
+                df_ultimos,
+                column_config={
+                    "Fecha": st.column_config.DateColumn(format="DD/MM/YYYY"),
+                    "Importe (€)": st.column_config.NumberColumn(format="%.2f €"),
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.info("Aún no has registrado ningún gasto")
+
+    except Exception as e:
+        st.error(f"Error al cargar últimos gastos: {e}")
+
+    # Información sobre duplicados
+    with st.expander("ℹ️ ¿Qué pasa cuando importo mi extracto bancario?"):
+        st.markdown("""
+        **Detección automática de duplicados:**
+
+        Cuando importes tu extracto bancario del mes:
+        1. El sistema buscará transacciones duplicadas (misma fecha + importe + concepto)
+        2. Si encuentra un duplicado con un gasto que añadiste manualmente:
+           - **Prioriza los datos del banco** (son más fiables)
+           - Actualiza la transacción con los datos bancarios
+           - Mantiene tu categoría si ya la habías clasificado
+
+        **Recomendación:**
+        - Usa esta página para gastos que quieres registrar inmediatamente
+        - Al final del mes, importa tu extracto bancario normalmente
+        - El sistema se encargará de evitar duplicados automáticamente
+        """)
 
 def mostrar_transacciones():
     st.title("💸 Transacciones")
@@ -1015,30 +1182,99 @@ def mostrar_sincronizacion():
 
 def mostrar_configuracion():
     st.title("⚙️ Configuración")
-    st.subheader("Opciones de la Base de Datos")
 
-    if st.button("⚠️ Resetear Base de Datos"):
-        confirmacion = st.warning(
-            "¿Estás seguro de que quieres resetear la base de datos? ¡Esta acción borrará todos los datos!",
+    # ========== SECCIÓN: SALDO INICIAL ==========
+    st.subheader("💰 Saldo Inicial")
+    st.info("El saldo inicial se suma a todas las transacciones para calcular el líquido disponible total. "
+            "Úsalo para establecer el saldo de tu cuenta al comenzar a usar la app.")
+
+    config_actual = config_manager.obtener_config()
+
+    with st.form("form_saldo_inicial"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            saldo_inicial = st.number_input(
+                "Saldo inicial (€)",
+                value=config_actual.get('saldo_inicial', 0.0),
+                step=0.01,
+                format="%.2f",
+                help="Saldo de tu cuenta al comenzar a usar la aplicación"
+            )
+
+            fecha_inicial = st.date_input(
+                "Fecha del saldo inicial",
+                value=datetime.datetime.strptime(config_actual.get('fecha_saldo_inicial', '2025-01-01'), '%Y-%m-%d').date()
+                      if config_actual.get('fecha_saldo_inicial') else datetime.date.today(),
+                help="Fecha a la que corresponde este saldo"
+            )
+
+        with col2:
+            notas_inicial = st.text_area(
+                "Notas (opcional)",
+                value=config_actual.get('notas', ''),
+                height=100,
+                help="Información adicional sobre este saldo inicial"
+            )
+
+            st.metric(
+                "💧 Líquido Disponible Actual",
+                f"{metrics.calcular_liquido_disponible():.2f} €",
+                help="Saldo inicial + suma de todas las transacciones"
+            )
+
+        submitted = st.form_submit_button("💾 Guardar Saldo Inicial", type="primary", use_container_width=True)
+
+        if submitted:
+            if config_manager.actualizar_saldo_inicial(saldo_inicial, fecha_inicial, notas_inicial):
+                st.success(f"✅ Saldo inicial actualizado: {saldo_inicial:.2f} €")
+                st.rerun()
+            else:
+                st.error("❌ Error al guardar el saldo inicial")
+
+    st.markdown("---")
+
+    # ========== SECCIÓN: BASE DE DATOS ==========
+    st.subheader("🗄️ Gestión de Base de Datos")
+
+    col_info, col_reset = st.columns([2, 1])
+
+    with col_info:
+        st.warning(
+            "⚠️ **Resetear la base de datos eliminará todas las transacciones**, "
+            "pero el saldo inicial se mantendrá guardado y podrás restaurarlo después.",
             icon="⚠️"
         )
-        if confirmacion:
-            with st.spinner("Reseteando la base de datos..."):
-                db_manager.resetear_base_de_datos()
-            st.success("¡Base de datos reseteada con éxito!")
-            st.rerun()
 
-    st.write("Aquí irán otros ajustes generales de la aplicación.")
+    with col_reset:
+        if st.button("⚠️ Resetear Base de Datos", type="secondary", use_container_width=True):
+            confirmacion = st.warning(
+                "¿Estás seguro de que quieres resetear la base de datos? ¡Esta acción borrará todos los datos!",
+                icon="⚠️"
+            )
+            if confirmacion:
+                with st.spinner("Reseteando la base de datos..."):
+                    db_manager.resetear_base_de_datos()
+                st.success("¡Base de datos reseteada con éxito!")
+                st.info(f"💡 Tu saldo inicial de {config_actual.get('saldo_inicial', 0):.2f} € se mantiene guardado en la configuración.")
+                st.rerun()
 
-# --- Lógica para mostrar la página seleccionada ---
+# --- Importar módulo de Coche Eléctrico ---
+import pages_coche_electrico
+
+# --- Routing principal ---
 if pagina_seleccionada == "Dashboard":
     mostrar_dashboard()
+elif pagina_seleccionada == "Añadir Gasto":
+    mostrar_añadir_gasto()
 elif pagina_seleccionada == "Transacciones":
     mostrar_transacciones()
 elif pagina_seleccionada == "Importar":
     mostrar_importar()
 elif pagina_seleccionada == "Categorías":
     mostrar_categorias()
+elif pagina_seleccionada == "🔌 Coche Eléctrico":
+    pages_coche_electrico.mostrar_coche_electrico()
 elif pagina_seleccionada == "Sincronización":
     mostrar_sincronizacion()
 elif pagina_seleccionada == "Configuración":
