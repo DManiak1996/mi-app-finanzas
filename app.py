@@ -182,13 +182,43 @@ def mostrar_dashboard():
                 if transacciones:
                     df_trans = pd.DataFrame(transacciones)
                     df_trans['fecha'] = pd.to_datetime(df_trans['fecha'])
-                    df_trans = df_trans.sort_values('fecha')
+                    # Ordenar por fecha Y por saldo_posterior (descendente) para orden cronológico correcto
+                    # Las transacciones del mismo día se ordenan por saldo (del más alto al más bajo)
+                    # porque el banco las procesa en orden inverso al que aparecen en el Excel
+                    df_trans = df_trans.sort_values(['fecha', 'saldo_posterior'], ascending=[True, False])
 
                     # Calcular el saldo inicial del mes:
-                    # Líquido disponible total MENOS las transacciones del mes actual
-                    liquido_total = metrics.calcular_liquido_disponible()
-                    importe_mes_actual = df_trans['importe'].sum()
-                    saldo_inicial = liquido_total - importe_mes_actual
+                    # Obtener el último saldo_posterior del mes anterior
+                    conn_temp = db_manager.get_db_connection()
+                    cursor_temp = conn_temp.cursor()
+
+                    # Buscar última transacción del mes anterior con saldo_posterior
+                    cursor_temp.execute("""
+                        SELECT saldo_posterior
+                        FROM transacciones
+                        WHERE saldo_posterior IS NOT NULL
+                        AND (año < ? OR (año = ? AND mes < ?))
+                        ORDER BY fecha DESC, id DESC
+                        LIMIT 1
+                    """, (año, año, mes))
+
+                    resultado = cursor_temp.fetchone()
+                    conn_temp.close()
+
+                    if resultado:
+                        # Usar el último saldo del mes anterior
+                        saldo_inicial = resultado['saldo_posterior']
+                    else:
+                        # Si no hay mes anterior, usar saldo_inicial de config
+                        saldo_inicial = config_manager.obtener_saldo_inicial()
+
+                    # Usar saldo_posterior real si está disponible, sino calcular
+                    if 'saldo_posterior' in df_trans.columns and df_trans['saldo_posterior'].notna().all():
+                        # USAR SALDOS REALES DEL BANCO
+                        df_trans['saldo_disponible'] = df_trans['saldo_posterior']
+                    else:
+                        # CALCULAR (fallback para transacciones sin saldo_posterior)
+                        df_trans['saldo_disponible'] = saldo_inicial + df_trans['importe'].cumsum()
 
                     # Añadir punto inicial del mes (saldo al cierre del mes anterior)
                     fecha_inicial = df_trans['fecha'].min() - pd.Timedelta(days=1)
@@ -199,7 +229,6 @@ def mostrar_dashboard():
                     }])
 
                     # Combinar con las transacciones del mes
-                    df_trans['saldo_disponible'] = saldo_inicial + df_trans['importe'].cumsum()
                     df_completo = pd.concat([df_inicial, df_trans[['fecha', 'saldo_disponible']]], ignore_index=True)
 
                     # Crear gráfico de línea
