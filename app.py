@@ -59,6 +59,8 @@ inicializar_app()
 # --- CSS personalizado para mejorar UX ---
 st.markdown("""
 <style>
+/* ========== MEJORAS GENERALES ========== */
+
 /* Botones más grandes para mejor usabilidad móvil (WCAG AAA: 44x44px mínimo) */
 .stButton button {
     min-height: 44px !important;
@@ -78,11 +80,109 @@ st.markdown("""
     font-size: 16px !important; /* Previene zoom automático en iOS */
 }
 
-/* Mejorar legibilidad de métricas */
+/* Mejorar legibilidad de métricas - Fondo claro siempre */
 .stMetric {
-    background-color: #f8f9fa;
-    padding: 12px;
-    border-radius: 8px;
+    padding: 12px !important;
+    border-radius: 8px !important;
+}
+
+/* Asegurar que el valor de las métricas sea visible */
+.stMetric [data-testid="stMetricValue"] {
+    color: #262730 !important;
+}
+
+.stMetric label {
+    color: #31333F !important;
+}
+
+/* ========== RESPONSIVE MÓVIL ========== */
+
+/* Pantallas móviles (menor a 768px) */
+@media (max-width: 768px) {
+    /* Aumentar padding general para mejor toque */
+    .main .block-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    /* Títulos más pequeños en móvil */
+    h1 {
+        font-size: 1.75rem !important;
+    }
+
+    h2 {
+        font-size: 1.5rem !important;
+    }
+
+    h3 {
+        font-size: 1.25rem !important;
+    }
+
+    /* Métricas más compactas en móvil */
+    .stMetric label {
+        font-size: 0.875rem !important;
+    }
+
+    .stMetric [data-testid="stMetricValue"] {
+        font-size: 1.5rem !important;
+    }
+
+    /* Radio buttons horizontales más pequeños */
+    .stRadio > div {
+        gap: 0.5rem !important;
+    }
+
+    /* Tabs más compactos */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.25rem !important;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 12px !important;
+        font-size: 0.875rem !important;
+    }
+
+    /* DataFrames con scroll horizontal suave */
+    .stDataFrame {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Formularios en columna única en móvil */
+    .row-widget.stHorizontal {
+        flex-direction: column !important;
+    }
+
+    /* Sidebar más estrecho */
+    [data-testid="stSidebar"] {
+        min-width: 250px !important;
+    }
+}
+
+/* Pantallas muy pequeñas (menor a 480px - iPhone SE, etc) */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.5rem !important;
+    }
+
+    /* Métricas en formato vertical */
+    .stMetric {
+        min-width: 100% !important;
+    }
+
+    /* Botones full-width en móvil pequeño */
+    .stButton button {
+        width: 100% !important;
+    }
+}
+
+/* ========== MEJORAS PARA TABLET ========== */
+
+/* Tablets (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .main .block-container {
+        max-width: 95% !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -140,9 +240,13 @@ def mostrar_dashboard():
         )
 
     with col_selector4:
-        # Info: Usuario puede navegar con el sidebar
-        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear con los selectores
-        st.info("💡 Usa el menú lateral para añadir gastos")
+        # Selector de vista (Mes / Año) - Reemplaza sub-tabs
+        vista_periodo = st.radio(
+            "📊 Vista",
+            options=["Mes", "Año"],
+            horizontal=True,
+            help="Alterna entre vista mensual y anual"
+        )
 
     st.markdown("---")
 
@@ -155,10 +259,8 @@ def mostrar_dashboard():
 
     # ========== TAB 1: RESUMEN GENERAL ==========
     with tab_resumen:
-        # Sub-tabs para mensual y anual
-        subtab_mes, subtab_año = st.tabs([f"📆 {nombre_mes_seleccionado} {año}", f"📅 Año {año}"])
-
-        with subtab_mes:
+        # Vista mensual o anual según selector
+        if vista_periodo == "Mes":
             with st.spinner("Calculando métricas mensuales..."):
                 datos_mes = metrics.calcular_totales_mes(mes, año)
 
@@ -375,7 +477,7 @@ def mostrar_dashboard():
                 else:
                     st.info("No hay transacciones registradas en este mes")
 
-        with subtab_año:
+        else:  # Vista anual
             with st.spinner("Calculando métricas anuales..."):
                 datos_anuales = metrics.calcular_totales_anual(año)
 
@@ -434,10 +536,8 @@ def mostrar_dashboard():
 
     # ========== TAB 2: ANÁLISIS AVANZADO ==========
     with tab_analisis:
-        analisis_tabs = st.tabs(["📆 Mensual", "📅 Anual"])
-
-        # ANÁLISIS MENSUAL
-        with analisis_tabs[0]:
+        # Usar el mismo selector de vista del tab principal
+        if vista_periodo == "Mes":
             with st.spinner("Calculando análisis avanzado..."):
                 # Financial Health Score destacado
                 health = metrics.calcular_financial_health_score(mes, año)
@@ -589,8 +689,7 @@ def mostrar_dashboard():
                         help="Puntos por tendencia de mejora. Máximo 20pts. Si gastas menos que el mes anterior, ganas puntos"
                     )
 
-        # ANÁLISIS ANUAL
-        with analisis_tabs[1]:
+        else:  # Vista anual
             st.subheader("📅 Métricas Anuales Avanzadas")
 
             datos_anuales = metrics.calcular_totales_anual(año)
@@ -698,6 +797,9 @@ def mostrar_añadir_gasto():
     """Página para añadir gastos individuales manualmente"""
     st.title("➕ Añadir Nuevo Gasto")
     st.markdown("Registra gastos individuales que no están en tu extracto bancario o que quieres anotar inmediatamente.")
+
+    # Validación en tiempo real (fuera del formulario)
+    validation_errors = []
 
     # Formulario de añadir gasto
     with st.form("form_nuevo_gasto", clear_on_submit=True):

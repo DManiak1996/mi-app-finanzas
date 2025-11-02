@@ -150,11 +150,20 @@ def mostrar_registrar_recarga():
             help="Información adicional sobre esta recarga"
         )
 
+        # Validación previa visual
+        validacion_ok = True
+        if bateria_final <= bateria_inicial:
+            st.warning("⚠️ La batería final debe ser mayor que la inicial")
+            validacion_ok = False
+        elif kwh_cargados <= 0:
+            st.warning("⚠️ Los kWh deben ser positivos")
+            validacion_ok = False
+
         # Botón de submit
-        submitted = st.form_submit_button("💾 Guardar Recarga", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("💾 Guardar Recarga", type="primary", use_container_width=True, disabled=not validacion_ok)
 
         if submitted:
-            # Validaciones
+            # Validaciones (por si acaso)
             if bateria_final <= bateria_inicial:
                 st.error("❌ La batería final debe ser mayor que la inicial")
             elif kwh_cargados <= 0:
