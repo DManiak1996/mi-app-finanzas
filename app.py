@@ -27,6 +27,33 @@ def inicializar_app():
     """Inicializa la base de datos creando las tablas si es necesario."""
     db_manager.crear_tablas()
 
+    # Migración automática: añadir campos 'pagado' y 'fecha_pago' si no existen
+    try:
+        conn = db_manager.get_db_connection()
+        cursor = conn.cursor()
+
+        # Verificar si los campos existen
+        cursor.execute("PRAGMA table_info(recargas_coche)")
+        columnas = [col[1] for col in cursor.fetchall()]
+
+        # Añadir campo 'pagado' si no existe
+        if 'pagado' not in columnas:
+            cursor.execute("ALTER TABLE recargas_coche ADD COLUMN pagado BOOLEAN DEFAULT 0")
+            print("✅ Campo 'pagado' añadido a recargas_coche")
+
+        # Añadir campo 'fecha_pago' si no existe
+        if 'fecha_pago' not in columnas:
+            cursor.execute("ALTER TABLE recargas_coche ADD COLUMN fecha_pago TIMESTAMP")
+            print("✅ Campo 'fecha_pago' añadido a recargas_coche")
+
+        # Asegurar que recargas existentes estén marcadas como no pagadas
+        cursor.execute("UPDATE recargas_coche SET pagado = 0 WHERE pagado IS NULL")
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Migración: {e}")
+
 inicializar_app()
 
 # --- CSS personalizado para mejorar UX ---
