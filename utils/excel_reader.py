@@ -83,8 +83,13 @@ def leer_excel(file_path):
                 fecha = pd.to_datetime(row[col_fecha], errors='coerce', dayfirst=True).date()
                 if not fecha:
                     continue
-                
+
                 concepto = str(row[col_concepto])
+
+                # OMITIR recargas de coche (ya están registradas manualmente y pagadas)
+                if 'recarga coche' in concepto.lower():
+                    logging.info(f"Omitiendo transacción de recarga coche (ya registrada manualmente): {concepto}")
+                    continue
                 
                 try:
                     # Usar locale para convertir el string a float

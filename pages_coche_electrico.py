@@ -324,6 +324,62 @@ def mostrar_registrar_recarga():
                     st.rerun()
                 else:
                     st.error("❌ Error al eliminar la recarga")
+
+        # Sección para PAGAR recargas pendientes del mes
+        st.markdown("---")
+        st.subheader("💰 Pagar Recargas del Mes")
+
+        col_pago1, col_pago2 = st.columns(2)
+
+        with col_pago1:
+            # Selector de mes y año
+            mes_pagar = st.selectbox(
+                "Mes a pagar",
+                options=list(range(1, 13)),
+                format_func=lambda x: datetime.date(2000, x, 1).strftime("%B"),
+                index=datetime.date.today().month - 1
+            )
+            año_pagar = st.number_input(
+                "Año",
+                min_value=2020,
+                max_value=2030,
+                value=datetime.date.today().year,
+                step=1
+            )
+
+        with col_pago2:
+            # Obtener recargas pendientes del mes seleccionado
+            recargas_pendientes = db_manager.obtener_recargas_pendientes(mes=mes_pagar, año=año_pagar)
+
+            if recargas_pendientes:
+                total_pendiente = sum(r['coste_total'] for r in recargas_pendientes)
+                st.metric("Recargas pendientes", len(recargas_pendientes))
+                st.metric("Total a pagar", f"{total_pendiente:.2f} €")
+
+                # Fecha de pago
+                fecha_pago = st.date_input(
+                    "Fecha del pago (ej: fecha del bizum)",
+                    value=datetime.date.today()
+                )
+
+                # Botón para pagar
+                if st.button("✅ Marcar como Pagadas y Crear Transacción", type="primary", use_container_width=True):
+                    resultado = db_manager.pagar_recargas_mes(
+                        mes=mes_pagar,
+                        año=año_pagar,
+                        fecha_pago=fecha_pago
+                    )
+
+                    if resultado:
+                        id_transaccion, total, num_recargas = resultado
+                        st.success(f"✅ {num_recargas} recargas pagadas por {total:.2f}€")
+                        st.info(f"💳 Transacción creada con concepto 'Recarga coche'")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error("❌ Error al procesar el pago")
+            else:
+                st.info(f"ℹ️ No hay recargas pendientes para {datetime.date(2000, mes_pagar, 1).strftime('%B')} {año_pagar}")
     else:
         st.info("No hay recargas registradas aún.")
 

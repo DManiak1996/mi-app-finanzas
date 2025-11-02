@@ -119,8 +119,12 @@ CREATE TABLE IF NOT EXISTS recargas_coche (
     mes INTEGER NOT NULL,
     año INTEGER NOT NULL,
 
+    -- Estado de pago
+    pagado BOOLEAN DEFAULT 0,  -- 0 = pendiente, 1 = pagado
+    fecha_pago TIMESTAMP,  -- Fecha en la que se registró el pago
+
     -- Referencias
-    transaccion_id TEXT,  -- FK a transacciones (se crea automáticamente)
+    transaccion_id TEXT,  -- FK a transacciones (se crea solo cuando pagado=1)
     categoria TEXT DEFAULT 'COCHE_ELECTRICO',
 
     notas TEXT,

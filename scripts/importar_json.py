@@ -3,6 +3,11 @@
 
 import json
 import sys
+import os
+
+# Añadir directorio raíz al path para imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from utils import sync
 
 def importar_archivo(ruta_json):

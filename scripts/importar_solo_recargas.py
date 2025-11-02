@@ -3,6 +3,11 @@
 
 import json
 import sys
+import os
+
+# Añadir directorio raíz al path para imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import db_manager
 
 def importar_solo_recargas(ruta_json):
@@ -94,8 +99,10 @@ def importar_solo_recargas(ruta_json):
                         r['coste_total'],
                         r['mes'],
                         r['año'],
+                        r.get('pagado', 0),  # NUEVO: por defecto pendiente
+                        r.get('fecha_pago'),  # NUEVO: puede ser NULL
                         r.get('transaccion_id'),
-                        r.get('categoria', 'FIJOS'),
+                        r.get('categoria', 'COCHE_ELECTRICO'),
                         r.get('notas', '')
                     )
                     for r in recargas_a_insertar
@@ -107,8 +114,8 @@ def importar_solo_recargas(ruta_json):
                         km_recorridos, consumo_medio, franja_horaria, tarifa_kwh,
                         coste_energia, coste_potencia, coste_alquiler, coste_bono, coste_servicios,
                         impuesto_electricidad, iva, coste_total,
-                        mes, año, transaccion_id, categoria, notas
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        mes, año, pagado, fecha_pago, transaccion_id, categoria, notas
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, valores)
 
                 conn.commit()

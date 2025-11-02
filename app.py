@@ -692,7 +692,7 @@ def mostrar_añadir_gasto():
 
     try:
         # Obtener últimos 10 gastos
-        conn = sqlite3.connect('finanzas.db')
+        conn = db_manager.get_db_connection()
         query = """
         SELECT fecha, concepto, importe, categoria
         FROM transacciones

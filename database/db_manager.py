@@ -182,13 +182,24 @@ def buscar_transacciones(termino_busqueda):
     return transacciones
 
 def resetear_base_de_datos():
-    """Elimina todas las tablas y las vuelve a crear, limpiando la base de datos."""
+    """Elimina TODAS las tablas y las vuelve a crear, limpiando completamente la base de datos."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.executescript("""DROP TABLE IF EXISTS transacciones;""")
+
+        # Eliminar TODAS las tablas
+        cursor.executescript("""
+            DROP TABLE IF EXISTS transacciones;
+            DROP TABLE IF EXISTS custom_categories;
+            DROP TABLE IF EXISTS classification_rules;
+            DROP TABLE IF EXISTS facturas_electricidad;
+            DROP TABLE IF EXISTS recargas_coche;
+        """)
+
+        # Recrear todas las tablas
         crear_tablas()
         conn.close()
+        print("✅ Base de datos reseteada completamente (transacciones + recargas + facturas)")
     except Exception as e:
         print(f"Error al resetear la base de datos: {e}")
 
@@ -231,59 +242,48 @@ def insertar_recarga_coche(
     fecha_recarga, bateria_inicial, bateria_final, kwh_cargados,
     km_recorridos, consumo_medio, franja_horaria, tarifa_kwh,
     coste_energia, coste_potencia, coste_alquiler, coste_bono, coste_servicios,
-    impuesto_electricidad, iva, coste_total, mes, año, categoria='FIJOS', notas=''
+    impuesto_electricidad, iva, coste_total, mes, año, categoria='COCHE_ELECTRICO', notas=''
 ):
     """
     Inserta una nueva recarga de coche eléctrico en la BD.
-    También crea automáticamente una transacción asociada.
+    La recarga queda como PENDIENTE (no afecta liquidez hasta que se marque como pagada).
 
     Returns:
-        Tuple (id_recarga, id_transaccion) si tiene éxito, None si falla
+        id_recarga si tiene éxito, None si falla
     """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # Generar IDs
+        # Generar ID de recarga
         id_recarga = generar_uuid()
-        id_transaccion = generar_uuid()
 
-        # 1. Insertar en tabla recargas_coche
         # Convertir fecha_recarga a string si es necesario
         if hasattr(fecha_recarga, 'isoformat'):
             fecha_recarga_str = fecha_recarga.isoformat()
         else:
             fecha_recarga_str = str(fecha_recarga)
 
+        # Insertar en tabla recargas_coche (SIN crear transacción todavía)
         cursor.execute("""
             INSERT INTO recargas_coche (
                 id, fecha_recarga, bateria_inicial, bateria_final, kwh_cargados,
                 km_recorridos, consumo_medio, franja_horaria, tarifa_kwh,
                 coste_energia, coste_potencia, coste_alquiler, coste_bono, coste_servicios,
                 impuesto_electricidad, iva, coste_total,
-                mes, año, transaccion_id, categoria, notas
+                mes, año, pagado, categoria, notas
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             id_recarga, fecha_recarga_str, bateria_inicial, bateria_final, kwh_cargados,
             km_recorridos, consumo_medio, franja_horaria, tarifa_kwh,
             coste_energia, coste_potencia, coste_alquiler, coste_bono, coste_servicios,
             impuesto_electricidad, iva, coste_total,
-            mes, año, id_transaccion, categoria, notas
-        ))
-
-        # 2. Insertar en tabla transacciones (como gasto)
-        concepto = f"Recarga coche eléctrico ({kwh_cargados:.1f} kWh)"
-        cursor.execute("""
-            INSERT INTO transacciones (
-                id, fecha, concepto, importe, categoria, tipo, mes, año, notas
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            id_transaccion, fecha_recarga_str, concepto, -abs(coste_total),
-            categoria, 'GASTO', mes, año, notas
+            mes, año, 0,  # pagado = 0 (pendiente)
+            categoria, notas
         ))
 
         conn.commit()
-        return (id_recarga, id_transaccion)
+        return id_recarga
 
     except sqlite3.Error as e:
         import traceback
@@ -623,3 +623,117 @@ def obtener_recarga_por_id(id_recarga):
     conn.close()
 
     return dict(resultado) if resultado else None
+
+
+def pagar_recargas_mes(mes, año, fecha_pago, categoria='COCHE_ELECTRICO', notas=''):
+    """
+    Marca todas las recargas pendientes de un mes como pagadas y crea UNA transacción
+    con la suma total de todas las recargas.
+
+    Args:
+        mes: Mes de las recargas (1-12)
+        año: Año de las recargas
+        fecha_pago: Fecha en la que se realiza el pago (ej: fecha del bizum)
+        categoria: Categoría para la transacción (default: 'COCHE_ELECTRICO')
+        notas: Notas adicionales
+
+    Returns:
+        Tuple (id_transaccion, total_pagado, num_recargas) si tiene éxito, None si falla
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # 1. Obtener todas las recargas pendientes del mes
+        cursor.execute("""
+            SELECT * FROM recargas_coche
+            WHERE mes = ? AND año = ? AND pagado = 0
+            ORDER BY fecha_recarga ASC
+        """, (mes, año))
+
+        recargas_pendientes = [dict(row) for row in cursor.fetchall()]
+
+        if not recargas_pendientes:
+            print(f"No hay recargas pendientes para {mes}/{año}")
+            return None
+
+        # 2. Calcular total a pagar y recopilar datos
+        total_coste = sum(r['coste_total'] for r in recargas_pendientes)
+        total_kwh = sum(r['kwh_cargados'] for r in recargas_pendientes)
+        num_recargas = len(recargas_pendientes)
+
+        # 3. Crear la transacción única
+        id_transaccion = generar_uuid()
+
+        # Convertir fecha_pago a string si es necesario
+        if hasattr(fecha_pago, 'isoformat'):
+            fecha_pago_str = fecha_pago.isoformat()
+        else:
+            fecha_pago_str = str(fecha_pago)
+
+        # Concepto genérico para que Excel lo detecte y omita duplicados
+        concepto = f"Recarga coche"
+        if notas:
+            notas_completas = f"{notas} | {num_recargas} recargas, {total_kwh:.1f} kWh"
+        else:
+            notas_completas = f"{num_recargas} recargas del mes {mes}/{año}, {total_kwh:.1f} kWh totales"
+
+        cursor.execute("""
+            INSERT INTO transacciones (
+                id, fecha, concepto, importe, categoria, tipo, mes, año, notas
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            id_transaccion, fecha_pago_str, concepto, -abs(total_coste),
+            categoria, 'GASTO', mes, año, notas_completas
+        ))
+
+        # 4. Marcar todas las recargas como pagadas y vincularlas a la transacción
+        for recarga in recargas_pendientes:
+            cursor.execute("""
+                UPDATE recargas_coche
+                SET pagado = 1, fecha_pago = ?, transaccion_id = ?
+                WHERE id = ?
+            """, (fecha_pago_str, id_transaccion, recarga['id']))
+
+        conn.commit()
+        print(f"✅ Pagadas {num_recargas} recargas del mes {mes}/{año} por {total_coste:.2f}€")
+        return (id_transaccion, total_coste, num_recargas)
+
+    except sqlite3.Error as e:
+        print(f"Error al pagar recargas: {e}")
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+
+def obtener_recargas_pendientes(mes=None, año=None):
+    """
+    Obtiene las recargas pendientes de pago, opcionalmente filtradas por mes/año.
+
+    Args:
+        mes: Mes (1-12) opcional
+        año: Año opcional
+
+    Returns:
+        Lista de diccionarios con recargas pendientes
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = "SELECT * FROM recargas_coche WHERE pagado = 0"
+    params = []
+
+    if mes:
+        query += " AND mes = ?"
+        params.append(mes)
+    if año:
+        query += " AND año = ?"
+        params.append(año)
+
+    query += " ORDER BY fecha_recarga DESC"
+
+    cursor.execute(query, params)
+    recargas = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return recargas
