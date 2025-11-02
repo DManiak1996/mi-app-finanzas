@@ -36,3 +36,10 @@ opencode.json
 
 # Script de lanzamiento local
 launch_app.command
+
+# Archivos temporales y backups
+.archive/
+*.pdf
+
+# JSON exports temporales
+finanzas_export_*.json
