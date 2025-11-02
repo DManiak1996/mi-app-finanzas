@@ -29,6 +29,7 @@ def exportar_base_datos() -> Dict:
 def importar_base_datos(data: Dict, modo: str = "fusionar") -> Dict:
     """
     Importa transacciones desde un diccionario.
+    Optimizado para importaciones grandes usando batch inserts.
 
     Args:
         data: Diccionario con transacciones
@@ -52,16 +53,22 @@ def importar_base_datos(data: Dict, modo: str = "fusionar") -> Dict:
         # (Por seguridad, no implementamos esto por ahora)
         pass
 
-    # Obtener IDs existentes para detectar duplicados
-    transacciones_existentes = db_manager.obtener_transacciones()
-    ids_existentes = {t['id'] for t in transacciones_existentes}
+    # Obtener solo IDs existentes (mucho más rápido que obtener todo)
+    import sqlite3
+    conn = db_manager.get_db_connection()
+    cursor = conn.cursor()
 
-    # Crear un conjunto de transacciones existentes por (fecha, importe, concepto)
-    # para detectar duplicados por contenido
+    cursor.execute("SELECT id, fecha, importe, concepto FROM transacciones")
+    transacciones_existentes = cursor.fetchall()
+
+    ids_existentes = {t['id'] for t in transacciones_existentes}
     transacciones_por_contenido = {
         (t['fecha'], t['importe'], t['concepto']): t['id']
         for t in transacciones_existentes
     }
+
+    # Preparar transacciones para inserción en lote
+    transacciones_a_insertar = []
 
     for transaccion in transacciones_importar:
         try:
@@ -70,7 +77,7 @@ def importar_base_datos(data: Dict, modo: str = "fusionar") -> Dict:
                 stats["duplicadas"] += 1
                 continue
 
-            # Verificar si existe una transacción similar (mismo fecha, importe, concepto)
+            # Verificar si existe una transacción similar
             clave_contenido = (
                 transaccion['fecha'],
                 transaccion['importe'],
@@ -81,25 +88,51 @@ def importar_base_datos(data: Dict, modo: str = "fusionar") -> Dict:
                 stats["duplicadas"] += 1
                 continue
 
-            # Insertar nueva transacción
-            db_manager.insertar_transaccion(
-                id=transaccion['id'],
-                fecha=transaccion['fecha'],
-                concepto=transaccion['concepto'],
-                importe=transaccion['importe'],
-                categoria=transaccion['categoria'],
-                tipo=transaccion['tipo'],
-                mes=transaccion['mes'],
-                año=transaccion['año'],
-                notas=transaccion.get('notas', ''),
-                saldo_posterior=transaccion.get('saldo_posterior')
-            )
-
+            # Agregar a lista de inserción
+            transacciones_a_insertar.append(transaccion)
             stats["nuevas"] += 1
 
         except Exception as e:
-            print(f"Error al importar transacción: {e}")
+            print(f"Error al procesar transacción: {e}")
             stats["errores"] += 1
+
+    # Inserción en lote (mucho más rápido)
+    if transacciones_a_insertar:
+        try:
+            # Insertar todas de una vez usando executemany
+            valores = [
+                (
+                    t['id'],
+                    t['fecha'],
+                    t['concepto'],
+                    t['importe'],
+                    t['categoria'],
+                    t['tipo'],
+                    t['mes'],
+                    t['año'],
+                    t.get('notas', ''),
+                    t.get('saldo_posterior')
+                )
+                for t in transacciones_a_insertar
+            ]
+
+            cursor.executemany("""
+                INSERT INTO transacciones
+                (id, fecha, concepto, importe, categoria, tipo, mes, año, notas, saldo_posterior)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, valores)
+
+            conn.commit()
+
+        except Exception as e:
+            print(f"Error en inserción por lotes: {e}")
+            conn.rollback()
+            stats["errores"] += len(transacciones_a_insertar)
+            stats["nuevas"] = 0
+        finally:
+            conn.close()
+    else:
+        conn.close()
 
     return stats
 
