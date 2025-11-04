@@ -1103,7 +1103,7 @@ def mostrar_transacciones():
                 "fecha": st.column_config.DateColumn("Fecha", format="YYYY-MM-DD"),
                 "concepto": st.column_config.TextColumn("Concepto", width="large"), # 'width' aquí se refiere al tamaño de la columna, no al aviso.
                 "importe": st.column_config.NumberColumn("Importe", format="%.2f €"),
-                "categoria": st.column_config.SelectboxColumn("Categoría", options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "INGRESO", "SIN_CLASIFICAR"], width="medium")
+                "categoria": st.column_config.SelectboxColumn("Categoría", options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "REEMBOLSO", "INGRESO", "SIN_CLASIFICAR"], width="medium")
             }
             
             df_editado = st.data_editor(
