@@ -14,7 +14,7 @@ def calcular_totales_mes(mes, año):
 
     total_ingresos = sum(t['importe'] for t in transacciones if t['tipo'] == 'INGRESO' and t.get('categoria') != 'REEMBOLSO')
     total_gastos = sum(t['importe'] for t in transacciones if t['tipo'] == 'GASTO')
-    total_reembolsos = sum(t['importe'] for t in transacciones if t.get('categoria') == 'REEMBOLSO')
+    total_reembolsos = sum(t['importe'] for t in transacciones if t.get('categoria') == 'REEMBOLSO' and t['tipo'] == 'INGRESO')
 
     # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
     gastos_netos = total_gastos + total_reembolsos
@@ -49,7 +49,7 @@ def calcular_totales_anual(año):
     # Separar ingresos regulares de reembolsos
     total_ingresos = df[(df['tipo'] == 'INGRESO') & (df['categoria'] != 'REEMBOLSO')]['importe'].sum()
     total_gastos = df[df['tipo'] == 'GASTO']['importe'].sum()
-    total_reembolsos = df[df['categoria'] == 'REEMBOLSO']['importe'].sum()
+    total_reembolsos = df[(df['categoria'] == 'REEMBOLSO') & (df['tipo'] == 'INGRESO')]['importe'].sum()
 
     # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
     gastos_netos = total_gastos + total_reembolsos
@@ -61,7 +61,7 @@ def calcular_totales_anual(año):
     evolucion_mensual = df.groupby(df['fecha'].dt.month).agg(
         ingresos=('importe', lambda x: x[(x > 0) & (df.loc[x.index, 'categoria'] != 'REEMBOLSO')].sum()),
         gastos=('importe', lambda x: x[x < 0].sum()),
-        reembolsos=('importe', lambda x: x[df.loc[x.index, 'categoria'] == 'REEMBOLSO'].sum())
+        reembolsos=('importe', lambda x: x[(df.loc[x.index, 'categoria'] == 'REEMBOLSO') & (df.loc[x.index, 'tipo'] == 'INGRESO')].sum())
     ).reindex(range(1, 13), fill_value=0)
     evolucion_mensual['gastos_netos'] = evolucion_mensual['gastos'] + evolucion_mensual['reembolsos']
     evolucion_mensual['balance'] = evolucion_mensual['ingresos'] + evolucion_mensual['gastos_netos']
@@ -102,7 +102,7 @@ def calcular_evolucion_mensual():
     df_agrupado = df_filtrado.groupby([df_filtrado['fecha'].dt.year.rename('año'), df_filtrado['fecha'].dt.month.rename('mes')]).apply(lambda x: pd.Series({
         'ingresos': x[(x['tipo'] == 'INGRESO') & (x['categoria'] != 'REEMBOLSO')]['importe'].sum(),
         'gastos': x[x['tipo'] == 'GASTO']['importe'].sum(),
-        'reembolsos': x[x['categoria'] == 'REEMBOLSO']['importe'].sum()
+        'reembolsos': x[(x['categoria'] == 'REEMBOLSO') & (x['tipo'] == 'INGRESO')]['importe'].sum()
     })).reset_index()
 
     df_agrupado['gastos_netos'] = df_agrupado['gastos'] + df_agrupado['reembolsos']
