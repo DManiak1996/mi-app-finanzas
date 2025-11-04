@@ -109,25 +109,27 @@ def calcular_liquido_disponible():
 def calcular_tasa_ahorro(mes, año):
     """
     Calcula el porcentaje de ingresos que se está ahorrando.
+    Usa el ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual.
 
     Returns:
-        Dict con tasa_ahorro (%), ingresos, gastos, ahorro_absoluto
+        Dict con tasa_ahorro (%), ingreso_base, gastos, ahorro_absoluto
     """
     datos = calcular_totales_mes(mes, año)
 
-    ingresos = datos['total_ingresos']
+    # Usar ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual
+    ingreso_base = obtener_ingreso_base_mes(mes, año)
     gastos = abs(datos['total_gastos'])  # Convertir a positivo
-    ahorro = ingresos - gastos
+    ahorro = ingreso_base - gastos
 
-    if ingresos == 0:
+    if ingreso_base == 0:
         tasa = 0
     else:
-        tasa = (ahorro / ingresos) * 100
+        tasa = (ahorro / ingreso_base) * 100
 
     return {
         'tasa_ahorro': round(tasa, 2),
         'ahorro_absoluto': round(ahorro, 2),
-        'ingresos': round(ingresos, 2),
+        'ingreso_base': round(ingreso_base, 2),
         'gastos': round(gastos, 2)
     }
 
@@ -300,25 +302,29 @@ def calcular_proyeccion_balance(meses_futuro=3):
 def calcular_efficiency_ratios(mes, año):
     """
     Calcula ratios de eficiencia financiera.
+    Usa el ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual.
 
     Returns:
         Dict con ratios de cada categoría sobre ingresos
     """
     datos = calcular_totales_mes(mes, año)
-    ingresos = datos['total_ingresos']
 
-    if ingresos == 0:
+    # Usar ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual
+    ingreso_base = obtener_ingreso_base_mes(mes, año)
+
+    if ingreso_base == 0:
         return {
             'ratio_fijos': 0,
             'ratio_disfrute': 0,
             'ratio_extraordinarios': 0,
-            'evaluacion': 'Sin ingresos registrados'
+            'evaluacion': 'Sin ingreso base registrado',
+            'ingreso_base': 0
         }
 
     # Ratios por categoría
     ratios = {}
     for cat, gasto in datos['gastos_por_categoria'].items():
-        ratio = (abs(gasto) / ingresos) * 100
+        ratio = (abs(gasto) / ingreso_base) * 100
         ratios[f'ratio_{cat.lower()}'] = round(ratio, 2)
 
     # Evaluación
@@ -335,7 +341,7 @@ def calcular_efficiency_ratios(mes, año):
         evaluacion = '❌ Gastos excesivos, acción necesaria'
 
     ratios['evaluacion'] = evaluacion
-    ratios['ingresos'] = round(ingresos, 2)
+    ratios['ingreso_base'] = round(ingreso_base, 2)
 
     return ratios
 
