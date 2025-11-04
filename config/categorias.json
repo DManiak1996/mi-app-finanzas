@@ -216,12 +216,6 @@
       "patron": "RBO VOLKSWAGEN BANK, GMBH S.E.",
       "categoria": "FIJOS",
       "tipo": "GASTO"
-    },
-    {
-      "_descripcion": "REEMBOLSO: Bizums recibidos",
-      "patron": "BIZUM.*RECIBIDO|DEVOLUCION|REEMBOLSO|REINTEGRO",
-      "categoria": "REEMBOLSO",
-      "tipo": "INGRESO"
     }
   ]
 }

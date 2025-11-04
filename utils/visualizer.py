@@ -52,12 +52,12 @@ def grafico_evolucion_mensual(df_evolucion):
         marker=dict(color='green')
     ))
 
-    # Usar valores absolutos para el gráfico de gastos
+    # Usar valores absolutos para el gráfico de gastos netos
     fig.add_trace(go.Scatter(
         x=df_evolucion['periodo_str'],
-        y=df_evolucion['gastos'].abs(),
+        y=df_evolucion['gastos_netos'].abs(),
         mode='lines+markers',
-        name='Gastos',
+        name='Gastos Netos',
         marker=dict(color='red')
     ))
 
@@ -98,8 +98,8 @@ def grafico_evolucion_anual(df_evolucion, nombres_meses):
 
     fig.add_trace(go.Bar(
         x=df_evolucion['mes_nombre'],
-        y=df_evolucion['gastos'].abs(),
-        name='Gastos',
+        y=df_evolucion['gastos_netos'].abs(),
+        name='Gastos Netos',
         marker_color='red'
     ))
 
