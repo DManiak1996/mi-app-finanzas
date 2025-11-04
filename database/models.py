@@ -132,11 +132,25 @@ CREATE TABLE IF NOT EXISTS recargas_coche (
 );
 """
 
+# Sentencia SQL para crear la tabla de presupuestos mensuales
+CREATE_PRESUPUESTOS_TABLE = """
+CREATE TABLE IF NOT EXISTS presupuestos_mensuales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    categoria TEXT NOT NULL,
+    limite_mensual REAL NOT NULL,
+    activo BOOLEAN DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(categoria)
+);
+"""
+
 # Lista de todas las sentencias de creación de tablas
 ALL_TABLES = [
     CREATE_TRANSACTIONS_TABLE,
     CREATE_CUSTOM_CATEGORIES_TABLE,
     CREATE_CLASSIFICATION_RULES_TABLE,
     CREATE_FACTURAS_ELECTRICIDAD_TABLE,
-    CREATE_RECARGAS_COCHE_TABLE
+    CREATE_RECARGAS_COCHE_TABLE,
+    CREATE_PRESUPUESTOS_TABLE
 ]

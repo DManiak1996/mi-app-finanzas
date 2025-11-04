@@ -434,3 +434,72 @@ def calcular_financial_health_score(mes, año):
             'variacion': variacion['variacion_total']
         }
     }
+
+def obtener_ingreso_base_mes(mes, año):
+    """
+    Obtiene el ingreso base (normalmente nómina) del mes anterior.
+    Busca el ingreso más alto en los últimos 5 días del mes anterior.
+    Si no encuentra nada, busca en los primeros 5 días del mes actual (por si la nómina llegó tarde).
+    Si aún no hay, usa el ingreso total del mes actual.
+    """
+    from database import db_manager
+    import calendar
+    
+    # Calcular mes anterior
+    if mes == 1:
+        mes_anterior = 12
+        año_anterior = año - 1
+    else:
+        mes_anterior = mes - 1
+        año_anterior = año
+    
+    # Obtener último día del mes anterior
+    ultimo_dia_mes_anterior = calendar.monthrange(año_anterior, mes_anterior)[1]
+    
+    # Buscar ingresos en los últimos 5 días del mes anterior
+    conn = db_manager.get_db_connection()
+    cursor = conn.cursor()
+    
+    # Intentar primero en los últimos 5 días del mes anterior
+    cursor.execute("""
+        SELECT MAX(importe) as max_ingreso
+        FROM transacciones
+        WHERE tipo = 'INGRESO'
+        AND mes = ?
+        AND año = ?
+        AND CAST(strftime('%d', fecha) AS INTEGER) >= ?
+    """, (mes_anterior, año_anterior, ultimo_dia_mes_anterior - 4))
+    
+    resultado = cursor.fetchone()
+    max_ingreso = resultado['max_ingreso'] if resultado and resultado['max_ingreso'] else 0
+    
+    # Si no encontró nada, buscar en los primeros 5 días del mes actual
+    if max_ingreso == 0:
+        cursor.execute("""
+            SELECT MAX(importe) as max_ingreso
+            FROM transacciones
+            WHERE tipo = 'INGRESO'
+            AND mes = ?
+            AND año = ?
+            AND CAST(strftime('%d', fecha) AS INTEGER) <= 5
+        """, (mes, año))
+        
+        resultado = cursor.fetchone()
+        max_ingreso = resultado['max_ingreso'] if resultado and resultado['max_ingreso'] else 0
+    
+    # Si aún no hay, usar el ingreso total del mes actual
+    if max_ingreso == 0:
+        cursor.execute("""
+            SELECT SUM(importe) as total_ingreso
+            FROM transacciones
+            WHERE tipo = 'INGRESO'
+            AND mes = ?
+            AND año = ?
+        """, (mes, año))
+        
+        resultado = cursor.fetchone()
+        max_ingreso = resultado['total_ingreso'] if resultado and resultado['total_ingreso'] else 0
+    
+    conn.close()
+    
+    return max_ingreso

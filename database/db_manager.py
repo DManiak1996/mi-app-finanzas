@@ -737,3 +737,153 @@ def obtener_recargas_pendientes(mes=None, año=None):
     recargas = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return recargas
+
+
+# ========== FUNCIONES PRESUPUESTOS MENSUALES ==========
+
+def crear_presupuesto(categoria, limite_mensual):
+    """
+    Crea o actualiza un presupuesto mensual para una categoría.
+
+    Args:
+        categoria: Nombre de la categoría
+        limite_mensual: Límite mensual en euros
+
+    Returns:
+        True si se creó/actualizó correctamente, False en caso contrario
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO presupuestos_mensuales (categoria, limite_mensual, activo)
+            VALUES (?, ?, 1)
+            ON CONFLICT(categoria) DO UPDATE SET
+                limite_mensual = excluded.limite_mensual,
+                activo = 1,
+                updated_at = CURRENT_TIMESTAMP
+        """, (categoria, limite_mensual))
+
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Error al crear presupuesto: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def obtener_presupuestos():
+    """
+    Obtiene todos los presupuestos mensuales activos.
+
+    Returns:
+        Lista de diccionarios con los presupuestos
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM presupuestos_mensuales
+        WHERE activo = 1
+        ORDER BY categoria ASC
+    """)
+
+    presupuestos = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return presupuestos
+
+
+def obtener_presupuesto_categoria(categoria):
+    """
+    Obtiene el presupuesto de una categoría específica.
+
+    Args:
+        categoria: Nombre de la categoría
+
+    Returns:
+        Dict con el presupuesto o None si no existe
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM presupuestos_mensuales
+        WHERE categoria = ? AND activo = 1
+    """, (categoria,))
+
+    resultado = cursor.fetchone()
+    conn.close()
+
+    return dict(resultado) if resultado else None
+
+
+def eliminar_presupuesto(categoria):
+    """
+    Desactiva un presupuesto (no lo elimina físicamente).
+
+    Args:
+        categoria: Nombre de la categoría
+
+    Returns:
+        True si se desactivó correctamente, False en caso contrario
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            UPDATE presupuestos_mensuales
+            SET activo = 0, updated_at = CURRENT_TIMESTAMP
+            WHERE categoria = ?
+        """, (categoria,))
+
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.Error as e:
+        print(f"Error al eliminar presupuesto: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def obtener_resumen_presupuestos(mes, año):
+    """
+    Obtiene el resumen de presupuestos vs gastos reales para un mes específico.
+
+    Args:
+        mes: Mes (1-12)
+        año: Año
+
+    Returns:
+        Lista de diccionarios con el resumen por categoría
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            p.categoria,
+            p.limite_mensual as presupuesto,
+            COALESCE(SUM(ABS(t.importe)), 0) as gastado,
+            p.limite_mensual - COALESCE(SUM(ABS(t.importe)), 0) as restante,
+            CASE
+                WHEN p.limite_mensual > 0 THEN
+                    (COALESCE(SUM(ABS(t.importe)), 0) / p.limite_mensual) * 100
+                ELSE 0
+            END as porcentaje_usado
+        FROM presupuestos_mensuales p
+        LEFT JOIN transacciones t ON
+            t.categoria = p.categoria
+            AND t.tipo = 'GASTO'
+            AND t.mes = ?
+            AND t.año = ?
+        WHERE p.activo = 1
+        GROUP BY p.categoria, p.limite_mensual
+        ORDER BY porcentaje_usado DESC
+    """, (mes, año))
+
+    resumen = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return resumen

@@ -22,9 +22,9 @@ if not auth.check_authentication():
     st.stop()  # Detiene la ejecución si no está autenticado
 
 # --- Inicialización ---
-@st.cache_resource
 def inicializar_app():
     """Inicializa la base de datos creando las tablas si es necesario."""
+    # NO usar cache para asegurar que siempre se crean las tablas nuevas
     db_manager.crear_tablas()
 
     # Migración automática: añadir campos 'pagado' y 'fecha_pago' si no existen
@@ -266,10 +266,13 @@ def mostrar_dashboard():
 
                 # Métricas principales en cards - Layout responsive (2x2)
                 col1, col2 = st.columns(2)
+
+                # Usar ingreso base (nómina del mes anterior) en lugar del ingreso del mes actual
+                ingreso_base = metrics.obtener_ingreso_base_mes(mes, año)
                 col1.metric(
-                    "💰 Ingresos",
-                    f"{datos_mes['total_ingresos']:.2f} €",
-                    help="Suma de todos los ingresos del mes seleccionado"
+                    "💰 Ingreso Base",
+                    f"{ingreso_base:.2f} €",
+                    help="Ingreso principal (nómina) del mes anterior. Se usa como referencia para calcular gastos"
                 )
                 col2.metric(
                     "💸 Gastos",
@@ -278,24 +281,72 @@ def mostrar_dashboard():
                 )
 
                 col3, col4 = st.columns(2)
+
+                # Calcular balance basado en ingreso base
+                balance_vs_base = ingreso_base + datos_mes['total_gastos']  # total_gastos ya es negativo
                 col3.metric(
-                    "⚖️ Balance",
-                    f"{datos_mes['balance_neto']:.2f} €",
-                    delta=f"{datos_mes['balance_neto']:.2f} €",
-                    delta_color="normal" if datos_mes['balance_neto'] > 0 else "inverse",
-                    help="Diferencia entre ingresos y gastos (Ingresos - Gastos). Positivo = superávit, Negativo = déficit"
+                    "⚖️ Balance vs Ingreso Base",
+                    f"{balance_vs_base:.2f} €",
+                    delta=f"{balance_vs_base:.2f} €",
+                    delta_color="normal" if balance_vs_base > 0 else "inverse",
+                    help="Diferencia entre tu ingreso base (nómina) y los gastos del mes. Positivo = superávit, Negativo = déficit"
                 )
 
-                # Tasa de ahorro rápida
-                tasa = metrics.calcular_tasa_ahorro(mes, año)
+                # Tasa de ahorro basada en ingreso base
+                if ingreso_base > 0:
+                    tasa_ahorro_pct = (balance_vs_base / ingreso_base) * 100
+                else:
+                    tasa_ahorro_pct = 0
+
                 col4.metric(
                     "💾 Tasa Ahorro",
-                    f"{tasa['tasa_ahorro']:.1f}%",
-                    delta=f"{tasa['ahorro_absoluto']:.0f} €",
-                    help="Porcentaje de tus ingresos que has logrado ahorrar. Ideal: >20%. Te ayuda a medir tu capacidad de ahorro"
+                    f"{tasa_ahorro_pct:.1f}%",
+                    delta=f"{balance_vs_base:.0f} €",
+                    help="Porcentaje de tu ingreso base que has logrado ahorrar. Ideal: >20%. Mide tu capacidad de ahorro"
                 )
 
                 st.markdown("---")
+
+                # Mostrar presupuestos del mes (si existen)
+                resumen_presupuestos = db_manager.obtener_resumen_presupuestos(mes, año)
+                if resumen_presupuestos:
+                    st.subheader("📊 Presupuestos del Mes")
+
+                    for presupuesto in resumen_presupuestos:
+                        categoria = presupuesto['categoria']
+                        limite = presupuesto['presupuesto']
+                        gastado = presupuesto['gastado']
+                        restante = presupuesto['restante']
+                        porcentaje = presupuesto['porcentaje_usado']
+
+                        # Determinar color según porcentaje usado
+                        if porcentaje < 70:
+                            color = "🟢"
+                            barra_color = "#26a69a"
+                        elif porcentaje < 90:
+                            color = "🟡"
+                            barra_color = "#ff9800"
+                        else:
+                            color = "🔴"
+                            barra_color = "#ef5350"
+
+                        with st.container():
+                            col1, col2, col3 = st.columns([3, 1, 1])
+
+                            with col1:
+                                st.markdown(f"**{color} {categoria}**")
+                                # Barra de progreso visual
+                                st.progress(min(porcentaje / 100, 1.0))
+
+                            with col2:
+                                st.metric("Gastado", f"{gastado:.2f} €")
+
+                            with col3:
+                                st.metric("Restante", f"{restante:.2f} €",
+                                         delta=f"{porcentaje:.1f}% usado",
+                                         delta_color="inverse" if porcentaje > 100 else "off")
+
+                    st.markdown("---")
 
                 # Gráficos en columnas
                 col_grafico, col_detalle = st.columns([2, 1])
@@ -1451,6 +1502,83 @@ def mostrar_configuracion():
                 st.rerun()
             else:
                 st.error("❌ Error al guardar el saldo inicial")
+
+    st.markdown("---")
+
+    # ========== SECCIÓN: PRESUPUESTOS MENSUALES ==========
+    st.subheader("📊 Presupuestos Mensuales por Categoría")
+    st.info("Define límites mensuales de gasto por categoría para controlar mejor tus finanzas. "
+            "Los presupuestos se reflejarán en el dashboard para ver tu progreso en tiempo real.")
+
+    # Mostrar presupuestos actuales
+    presupuestos_actuales = db_manager.obtener_presupuestos()
+
+    if presupuestos_actuales:
+        st.markdown("#### 📋 Presupuestos Configurados")
+
+        # Crear DataFrame para mostrar
+        df_presupuestos = pd.DataFrame(presupuestos_actuales)
+        df_presupuestos = df_presupuestos[['categoria', 'limite_mensual']]
+        df_presupuestos.columns = ['Categoría', 'Límite Mensual (€)']
+
+        # Mostrar tabla editable con opción de eliminar
+        for idx, presupuesto in enumerate(presupuestos_actuales):
+            col1, col2, col3 = st.columns([2, 2, 1])
+
+            with col1:
+                st.text(presupuesto['categoria'])
+
+            with col2:
+                st.text(f"{presupuesto['limite_mensual']:.2f} €")
+
+            with col3:
+                if st.button("🗑️", key=f"del_presupuesto_{idx}", help="Eliminar presupuesto"):
+                    if db_manager.eliminar_presupuesto(presupuesto['categoria']):
+                        st.success(f"Presupuesto de {presupuesto['categoria']} eliminado")
+                        st.rerun()
+                    else:
+                        st.error("Error al eliminar presupuesto")
+
+        st.markdown("---")
+
+    # Formulario para añadir/actualizar presupuesto
+    st.markdown("#### ➕ Añadir/Actualizar Presupuesto")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Obtener categorías disponibles
+        categorias_disponibles = ["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "COCHE_ELECTRICO"]
+        categoria_presupuesto = st.selectbox(
+            "Categoría",
+            categorias_disponibles,
+            key="presupuesto_categoria",
+            help="Selecciona la categoría para la que quieres establecer un presupuesto"
+        )
+
+    with col2:
+        limite_mensual = st.number_input(
+            "Límite Mensual (€)",
+            min_value=0.01,
+            value=100.00,
+            step=10.00,
+            format="%.2f",
+            key="presupuesto_limite",
+            help="Cantidad máxima que quieres gastar en esta categoría cada mes"
+        )
+
+    if st.button("💾 Guardar Presupuesto", type="primary", use_container_width=True, key="btn_guardar_presupuesto"):
+        try:
+            resultado = db_manager.crear_presupuesto(categoria_presupuesto, limite_mensual)
+            if resultado:
+                st.success(f"✅ Presupuesto para {categoria_presupuesto} guardado: {limite_mensual:.2f} €/mes")
+                st.rerun()
+            else:
+                st.error("❌ Error al guardar el presupuesto - crear_presupuesto devolvió False")
+        except Exception as e:
+            st.error(f"❌ Error inesperado: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
 
     st.markdown("---")
 

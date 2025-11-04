@@ -211,6 +211,11 @@
       "patron": "PANADERIA|ZABALETA|TAHONA",
       "categoria": "DISFRUTE",
       "tipo": "GASTO"
+    },
+    {
+      "patron": "RBO VOLKSWAGEN BANK, GMBH S.E.",
+      "categoria": "FIJOS",
+      "tipo": "GASTO"
     }
   ]
 }
