@@ -274,24 +274,27 @@ def mostrar_dashboard():
                     f"{ingreso_base:.2f} €",
                     help="Ingreso principal (nómina) del mes anterior. Se usa como referencia para calcular gastos"
                 )
-                col2_1, col2_2 = st.columns([3, 1])
-                with col2_1:
-                    # Mostrar gastos netos (después de reembolsos)
-                    gastos_brutos = abs(datos_mes['total_gastos'])
-                    reembolsos = datos_mes['total_reembolsos']
-                    gastos_netos = abs(datos_mes['gastos_netos'])
 
-                    st.metric(
-                        "💸 Gastos Netos",
-                        f"{gastos_netos:.2f} €",
-                        delta=f"-{reembolsos:.2f} € reembolsados" if reembolsos > 0 else None,
-                        delta_color="normal",
-                        help=f"Gastos brutos: {gastos_brutos:.2f}€ - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
-                    )
-                with col2_2:
-                    # Botón para gestionar reembolsos
-                    if st.button("💰", key="btn_reembolsos", help="Gestionar reembolsos", use_container_width=True):
-                        st.session_state.mostrar_modal_reembolsos = True
+                with col2:
+                    col2_1, col2_2 = st.columns([4, 1])
+                    with col2_1:
+                        # Mostrar gastos netos (después de reembolsos)
+                        gastos_brutos = abs(datos_mes['total_gastos'])
+                        reembolsos = datos_mes['total_reembolsos']
+                        gastos_netos = abs(datos_mes['gastos_netos'])
+
+                        st.metric(
+                            "💸 Gastos Netos",
+                            f"{gastos_netos:.2f} €",
+                            delta=f"-{reembolsos:.2f} € reembolsados" if reembolsos > 0 else None,
+                            delta_color="normal",
+                            help=f"Gastos brutos: {gastos_brutos:.2f}€ - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
+                        )
+                    with col2_2:
+                        # Botón para gestionar reembolsos (más compacto)
+                        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear con métrica
+                        if st.button("💰", key="btn_reembolsos", help="Gestionar reembolsos", type="primary"):
+                            st.session_state.mostrar_modal_reembolsos = True
 
                 col3, col4 = st.columns(2)
 
@@ -595,12 +598,14 @@ def mostrar_dashboard():
                     col1.metric(
                         "💰 Ingresos Anuales",
                         f"{datos_anuales['total_ingresos']:.2f} €",
-                        help="Suma total de ingresos en todos los meses del año"
+                        help="Suma total de ingresos en todos los meses del año (sin reembolsos)"
                     )
                     col2.metric(
-                        "💸 Gastos Anuales",
-                        f"{abs(datos_anuales['total_gastos']):.2f} €",
-                        help="Suma total de gastos en todos los meses del año"
+                        "💸 Gastos Netos Anuales",
+                        f"{abs(datos_anuales['gastos_netos']):.2f} €",
+                        delta=f"-{datos_anuales['total_reembolsos']:.2f} € reembolsados" if datos_anuales['total_reembolsos'] > 0 else None,
+                        delta_color="normal",
+                        help=f"Gastos brutos: {abs(datos_anuales['total_gastos']):.2f}€ - Reembolsos: {datos_anuales['total_reembolsos']:.2f}€"
                     )
 
                     col3, col4 = st.columns(2)
@@ -766,8 +771,8 @@ def mostrar_dashboard():
 
                         total_top = df['importe'].sum()
                         datos_mes_top = metrics.calcular_totales_mes(mes, año)
-                        pct = (total_top / abs(datos_mes_top['total_gastos'])) * 100
-                        st.caption(f"💡 Representan el **{pct:.1f}%** del total")
+                        pct = (total_top / abs(datos_mes_top['gastos_netos'])) * 100
+                        st.caption(f"💡 Representan el **{pct:.1f}%** del total de gastos netos")
 
                 with st.expander("🔍 Desglose del Health Score"):
                     # Layout responsive (2x2)
@@ -808,7 +813,7 @@ def mostrar_dashboard():
                 # Ahorro anual total
                 ahorro_anual = datos_anuales['balance_neto']
                 ingresos_anuales = datos_anuales['total_ingresos']
-                gastos_anuales = abs(datos_anuales['total_gastos'])
+                gastos_anuales_netos = abs(datos_anuales['gastos_netos'])
 
                 tasa_ahorro_anual = (ahorro_anual / ingresos_anuales * 100) if ingresos_anuales > 0 else 0
 
@@ -820,11 +825,11 @@ def mostrar_dashboard():
                 )
 
                 # Promedio mensual
-                promedio_gasto_mensual = gastos_anuales / 12
+                promedio_gasto_mensual = gastos_anuales_netos / 12
                 col2.metric(
-                    "📊 Promedio Gasto/Mes",
+                    "📊 Promedio Gasto Neto/Mes",
                     f"{promedio_gasto_mensual:.2f} €",
-                    help="Gasto promedio mensual del año. Útil para establecer un presupuesto mensual realista"
+                    help="Gasto neto promedio mensual del año (después de reembolsos). Útil para establecer un presupuesto mensual realista"
                 )
 
                 promedio_ingreso_mensual = ingresos_anuales / 12
@@ -893,7 +898,7 @@ def mostrar_dashboard():
                     # Layout responsive (2x2)
                     col1, col2 = st.columns(2)
                     col1.metric("💰 Total Ingresos", f"{df_evol['ingresos'].sum():.2f} €")
-                    col2.metric("💸 Total Gastos", f"{abs(df_evol['gastos'].sum()):.2f} €")
+                    col2.metric("💸 Total Gastos Netos", f"{abs(df_evol['gastos_netos'].sum()):.2f} €")
 
                     col3, col4 = st.columns(2)
                     col3.metric("⚖️ Balance Total", f"{df_evol['balance'].sum():.2f} €")

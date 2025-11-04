@@ -37,6 +37,7 @@ def calcular_totales_anual(año):
     """
     Calcula los totales de ingresos, gastos y el balance para un año específico.
     También devuelve datos mensuales para gráficos de evolución.
+    Incluye cálculo de gastos netos (restando reembolsos).
     """
     transacciones = db_manager.obtener_transacciones(año=año)
     if not transacciones:
@@ -45,26 +46,40 @@ def calcular_totales_anual(año):
     df = pd.DataFrame(transacciones)
     df['fecha'] = pd.to_datetime(df['fecha'])
 
-    total_ingresos = df[df['tipo'] == 'INGRESO']['importe'].sum()
+    # Separar ingresos regulares de reembolsos
+    total_ingresos = df[(df['tipo'] == 'INGRESO') & (df['categoria'] != 'REEMBOLSO')]['importe'].sum()
     total_gastos = df[df['tipo'] == 'GASTO']['importe'].sum()
-    balance_neto = total_ingresos + total_gastos
+    total_reembolsos = df[df['categoria'] == 'REEMBOLSO']['importe'].sum()
+
+    # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
+    gastos_netos = total_gastos + total_reembolsos
+    balance_neto = total_ingresos + gastos_netos
 
     gastos_por_categoria = df[df['tipo'] == 'GASTO'].groupby('categoria')['importe'].sum().to_dict()
 
+    # Evolución mensual con gastos netos
     evolucion_mensual = df.groupby(df['fecha'].dt.month).agg(
-        ingresos=('importe', lambda x: x[x > 0].sum()),
-        gastos=('importe', lambda x: x[x < 0].sum())
+        ingresos=('importe', lambda x: x[(x > 0) & (df.loc[x.index, 'categoria'] != 'REEMBOLSO')].sum()),
+        gastos=('importe', lambda x: x[x < 0].sum()),
+        reembolsos=('importe', lambda x: x[df.loc[x.index, 'categoria'] == 'REEMBOLSO'].sum())
     ).reindex(range(1, 13), fill_value=0)
-    evolucion_mensual['balance'] = evolucion_mensual['ingresos'] + evolucion_mensual['gastos']
+    evolucion_mensual['gastos_netos'] = evolucion_mensual['gastos'] + evolucion_mensual['reembolsos']
+    evolucion_mensual['balance'] = evolucion_mensual['ingresos'] + evolucion_mensual['gastos_netos']
 
     return {
-        "total_ingresos": total_ingresos, "total_gastos": total_gastos, "balance_neto": balance_neto,
-        "gastos_por_categoria": gastos_por_categoria, "evolucion_mensual": evolucion_mensual
+        "total_ingresos": total_ingresos,
+        "total_gastos": total_gastos,
+        "total_reembolsos": total_reembolsos,
+        "gastos_netos": gastos_netos,
+        "balance_neto": balance_neto,
+        "gastos_por_categoria": gastos_por_categoria,
+        "evolucion_mensual": evolucion_mensual
     }
 
 def calcular_evolucion_mensual():
     """
     Calcula la evolución de ingresos, gastos y balance de los últimos 12 meses.
+    Incluye cálculo de gastos netos (restando reembolsos).
     """
     # Obtener todas las transacciones de la base de datos
     transacciones = db_manager.obtener_transacciones()
@@ -73,24 +88,26 @@ def calcular_evolucion_mensual():
 
     df = pd.DataFrame(transacciones)
     df['fecha'] = pd.to_datetime(df['fecha'])
-    
+
     # Asegurarse de que solo se consideran los últimos 12 meses desde la última transacción
     fecha_max = df['fecha'].max()
     fecha_min = fecha_max - timedelta(days=365)
-    
+
     df_filtrado = df[df['fecha'] >= fecha_min]
-    
+
     if df_filtrado.empty:
         return pd.DataFrame()
 
     # Agrupar por año y mes
     df_agrupado = df_filtrado.groupby([df_filtrado['fecha'].dt.year.rename('año'), df_filtrado['fecha'].dt.month.rename('mes')]).apply(lambda x: pd.Series({
-        'ingresos': x[x['tipo'] == 'INGRESO']['importe'].sum(),
-        'gastos': x[x['tipo'] == 'GASTO']['importe'].sum()
+        'ingresos': x[(x['tipo'] == 'INGRESO') & (x['categoria'] != 'REEMBOLSO')]['importe'].sum(),
+        'gastos': x[x['tipo'] == 'GASTO']['importe'].sum(),
+        'reembolsos': x[x['categoria'] == 'REEMBOLSO']['importe'].sum()
     })).reset_index()
 
-    df_agrupado['balance'] = df_agrupado['ingresos'] + df_agrupado['gastos']
-    
+    df_agrupado['gastos_netos'] = df_agrupado['gastos'] + df_agrupado['reembolsos']
+    df_agrupado['balance'] = df_agrupado['ingresos'] + df_agrupado['gastos_netos']
+
     # Crear una columna de período para ordenar
     df_agrupado['periodo'] = pd.to_datetime(df_agrupado['año'].astype(str) + '-' + df_agrupado['mes'].astype(str) + '-01')
     df_agrupado = df_agrupado.sort_values('periodo').reset_index(drop=True)
@@ -126,7 +143,7 @@ def calcular_tasa_ahorro(mes, año):
 
     # Usar ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual
     ingreso_base = obtener_ingreso_base_mes(mes, año)
-    gastos = abs(datos['total_gastos'])  # Convertir a positivo
+    gastos = abs(datos['gastos_netos'])  # Usar gastos netos (después de reembolsos)
     ahorro = ingreso_base - gastos
 
     if ingreso_base == 0:
@@ -195,9 +212,9 @@ def calcular_variacion_mensual(mes, año):
     año_anterior = año if mes > 1 else año - 1
     datos_anterior = calcular_totales_mes(mes_anterior, año_anterior)
 
-    # Variación total
-    gastos_actual = abs(datos_actual['total_gastos'])
-    gastos_anterior = abs(datos_anterior['total_gastos'])
+    # Variación total - usar gastos netos (después de reembolsos)
+    gastos_actual = abs(datos_actual['gastos_netos'])
+    gastos_anterior = abs(datos_anterior['gastos_netos'])
 
     if gastos_anterior == 0:
         variacion_total = 0
