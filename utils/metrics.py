@@ -8,19 +8,27 @@ from datetime import datetime, timedelta
 def calcular_totales_mes(mes, año):
     """
     Calcula los totales de ingresos, gastos y el balance para un mes y año específicos.
+    Incluye cálculo de gastos netos (restando reembolsos).
     """
     transacciones = db_manager.obtener_transacciones(mes=mes, año=año)
-    
-    total_ingresos = sum(t['importe'] for t in transacciones if t['tipo'] == 'INGRESO')
+
+    total_ingresos = sum(t['importe'] for t in transacciones if t['tipo'] == 'INGRESO' and t.get('categoria') != 'REEMBOLSO')
     total_gastos = sum(t['importe'] for t in transacciones if t['tipo'] == 'GASTO')
-    balance_neto = total_ingresos + total_gastos # Gastos ya son negativos
-    
-    # Obtener gastos por categoría
+    total_reembolsos = sum(t['importe'] for t in transacciones if t.get('categoria') == 'REEMBOLSO')
+
+    # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
+    gastos_netos = total_gastos + total_reembolsos
+
+    balance_neto = total_ingresos + gastos_netos # Gastos netos ya son negativos
+
+    # Obtener gastos por categoría (excluyendo reembolsos)
     gastos_por_categoria = db_manager.obtener_totales_por_categoria(mes, año)
 
     return {
         "total_ingresos": total_ingresos,
         "total_gastos": total_gastos,
+        "total_reembolsos": total_reembolsos,
+        "gastos_netos": gastos_netos,
         "balance_neto": balance_neto,
         "gastos_por_categoria": gastos_por_categoria
     }

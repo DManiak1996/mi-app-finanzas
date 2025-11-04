@@ -274,16 +274,29 @@ def mostrar_dashboard():
                     f"{ingreso_base:.2f} €",
                     help="Ingreso principal (nómina) del mes anterior. Se usa como referencia para calcular gastos"
                 )
-                col2.metric(
-                    "💸 Gastos",
-                    f"{abs(datos_mes['total_gastos']):.2f} €",
-                    help="Suma total de todos los gastos del mes (en valor absoluto)"
-                )
+                col2_1, col2_2 = st.columns([3, 1])
+                with col2_1:
+                    # Mostrar gastos netos (después de reembolsos)
+                    gastos_brutos = abs(datos_mes['total_gastos'])
+                    reembolsos = datos_mes['total_reembolsos']
+                    gastos_netos = abs(datos_mes['gastos_netos'])
+
+                    st.metric(
+                        "💸 Gastos Netos",
+                        f"{gastos_netos:.2f} €",
+                        delta=f"-{reembolsos:.2f} € reembolsados" if reembolsos > 0 else None,
+                        delta_color="normal",
+                        help=f"Gastos brutos: {gastos_brutos:.2f}€ - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
+                    )
+                with col2_2:
+                    # Botón para gestionar reembolsos
+                    if st.button("💰", key="btn_reembolsos", help="Gestionar reembolsos", use_container_width=True):
+                        st.session_state.mostrar_modal_reembolsos = True
 
                 col3, col4 = st.columns(2)
 
-                # Calcular balance basado en ingreso base
-                balance_vs_base = ingreso_base + datos_mes['total_gastos']  # total_gastos ya es negativo
+                # Calcular balance basado en ingreso base usando gastos NETOS
+                balance_vs_base = ingreso_base + datos_mes['gastos_netos']  # gastos_netos ya es negativo
                 col3.metric(
                     "⚖️ Balance vs Ingreso Base",
                     f"{balance_vs_base:.2f} €",
@@ -306,6 +319,50 @@ def mostrar_dashboard():
                 )
 
                 st.markdown("---")
+
+                # Modal de gestión de reembolsos
+                if st.session_state.get('mostrar_modal_reembolsos', False):
+                    st.subheader("💰 Gestionar Reembolsos")
+                    st.info("Selecciona los ingresos (bizums, devoluciones) que son reembolsos de gastos y márcalos como REEMBOLSO.")
+
+                    # Obtener todos los ingresos del mes que NO sean ya reembolsos ni nómina
+                    ingresos_sin_clasificar = [
+                        t for t in db_manager.obtener_transacciones(mes=mes, año=año)
+                        if t['tipo'] == 'INGRESO'
+                        and t.get('categoria') not in ['REEMBOLSO', 'INGRESO']
+                        and t['importe'] < ingreso_base * 0.5  # Filtrar nómina (menos de 50% del ingreso base)
+                    ]
+
+                    if ingresos_sin_clasificar:
+                        st.write(f"**{len(ingresos_sin_clasificar)} ingresos pendientes de revisar:**")
+
+                        for ingreso in ingresos_sin_clasificar:
+                            col1, col2, col3, col4 = st.columns([2, 1, 2, 1])
+
+                            with col1:
+                                st.text(ingreso['fecha'])
+                            with col2:
+                                st.text(f"{ingreso['importe']:.2f} €")
+                            with col3:
+                                # Mostrar concepto truncado
+                                concepto = ingreso['concepto'][:40] + "..." if len(ingreso['concepto']) > 40 else ingreso['concepto']
+                                st.text(concepto)
+                            with col4:
+                                if st.button("✅ Marcar", key=f"marcar_reembolso_{ingreso['id']}", help="Marcar como REEMBOLSO"):
+                                    # Actualizar categoría a REEMBOLSO
+                                    db_manager.actualizar_transaccion(ingreso['id'], {'categoria': 'REEMBOLSO'})
+                                    st.success(f"Marcado como reembolso: {ingreso['importe']:.2f}€")
+                                    st.rerun()
+                    else:
+                        st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
+
+                    col_cerrar1, col_cerrar2, col_cerrar3 = st.columns([1, 1, 1])
+                    with col_cerrar2:
+                        if st.button("🔙 Cerrar", key="cerrar_modal_reembolsos", use_container_width=True):
+                            st.session_state.mostrar_modal_reembolsos = False
+                            st.rerun()
+
+                    st.markdown("---")
 
                 # Mostrar presupuestos del mes (si existen)
                 resumen_presupuestos = db_manager.obtener_resumen_presupuestos(mes, año)
