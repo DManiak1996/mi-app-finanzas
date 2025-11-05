@@ -120,60 +120,22 @@ def show_premium_login(authorized_email, correct_password):
     with col2:
         # === LOGO PREMIUM ===
         st.markdown(f"""
-        <div class="login-container" style="
-            background: {Colors.PREMIUM_CARD_GRADIENT};
-            padding: {Spacing.XXL};
-            border-radius: {BorderRadius.XL};
-            box-shadow: 0 20px 25px rgba(0,0,0,0.10), 0 10px 10px rgba(0,0,0,0.04);
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            backdrop-filter: blur(10px);
-            text-align: center;
-        ">
-            <!-- Logo centrado -->
-            <div style="margin-bottom: {Spacing.XL}; display: flex; justify-content: center;">
-                {brand_assets.LOGO_SVG}
-            </div>
-
-            <!-- Título con gradiente -->
-            <h1 style="
-                font-size: {Typography.TEXT_4XL};
-                font-weight: {Typography.WEIGHT_EXTRABOLD};
-                margin-bottom: {Spacing.SM};
-                background: {Colors.PREMIUM_GRADIENT_PRIMARY};
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            ">
-                Bienvenido
-            </h1>
-
-            <p style="
-                font-size: {Typography.TEXT_BASE};
-                color: {Colors.GRAY_600};
-                margin-bottom: {Spacing.XL};
-                font-weight: {Typography.WEIGHT_MEDIUM};
-            ">
-                Accede a tu control financiero premium
-            </p>
-        </div>
+<div class="login-container" style="background: {Colors.PREMIUM_CARD_GRADIENT}; padding: {Spacing.XXL}; border-radius: {BorderRadius.XL}; box-shadow: 0 20px 25px rgba(0,0,0,0.10), 0 10px 10px rgba(0,0,0,0.04); border: 1px solid rgba(102, 126, 234, 0.1); backdrop-filter: blur(10px); text-align: center;">
+    <div style="margin-bottom: {Spacing.XL}; display: flex; justify-content: center;">
+        {brand_assets.LOGO_SVG}
+    </div>
+    <h1 style="font-size: {Typography.TEXT_4XL}; font-weight: {Typography.WEIGHT_EXTRABOLD}; margin-bottom: {Spacing.SM}; background: {Colors.PREMIUM_GRADIENT_PRIMARY}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+        Bienvenido
+    </h1>
+    <p style="font-size: {Typography.TEXT_BASE}; color: {Colors.GRAY_600}; margin-bottom: {Spacing.XL}; font-weight: {Typography.WEIGHT_MEDIUM};">
+        Accede a tu control financiero premium
+    </p>
+</div>
         """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # === FORMULARIO CON GLASSMORPHISM ===
-        st.markdown(f"""
-        <div style="
-            background: {Colors.PREMIUM_CARD_GRADIENT};
-            padding: {Spacing.XL};
-            border-radius: {BorderRadius.LG};
-            box-shadow: 0 10px 15px rgba(0,0,0,0.08), 0 4px 6px rgba(0,0,0,0.06);
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            backdrop-filter: blur(10px);
-        ">
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Inputs
+        # === INPUTS PREMIUM ===
         email_input = st.text_input(
             "📧 Email",
             placeholder="tu-email@ejemplo.com",
