@@ -119,10 +119,13 @@ def show_premium_login(authorized_email, correct_password):
 
     with col2:
         # === LOGO PREMIUM ===
-        st.markdown(f"""
+        # No usar f-string con el SVG para evitar escape
+        login_card_html = f"""
 <div class="login-container" style="background: {Colors.PREMIUM_CARD_GRADIENT}; padding: {Spacing.XXL}; border-radius: {BorderRadius.XL}; box-shadow: 0 20px 25px rgba(0,0,0,0.10), 0 10px 10px rgba(0,0,0,0.04); border: 1px solid rgba(102, 126, 234, 0.1); backdrop-filter: blur(10px); text-align: center;">
     <div style="margin-bottom: {Spacing.XL}; display: flex; justify-content: center;">
-        {brand_assets.LOGO_SVG}
+"""
+        login_card_html += brand_assets.LOGO_SVG
+        login_card_html += f"""
     </div>
     <h1 style="font-size: {Typography.TEXT_4XL}; font-weight: {Typography.WEIGHT_EXTRABOLD}; margin-bottom: {Spacing.SM}; background: {Colors.PREMIUM_GRADIENT_PRIMARY}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
         Bienvenido
@@ -131,7 +134,8 @@ def show_premium_login(authorized_email, correct_password):
         Accede a tu control financiero premium
     </p>
 </div>
-        """, unsafe_allow_html=True)
+"""
+        st.markdown(login_card_html, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 

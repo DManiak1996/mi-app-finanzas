@@ -207,13 +207,17 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
 
 # --- LOGO PREMIUM EN HEADER ---
-st.markdown(f"""
+# No usar f-string con el SVG para evitar escape
+header_html = f"""
 <div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(102, 126, 234, 0.1);">
     <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG};">
-        {brand_assets.LOGO_SVG}
+"""
+header_html += brand_assets.LOGO_SVG
+header_html += """
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""
+st.markdown(header_html, unsafe_allow_html=True)
 
 # --- CSS FINTECH PREMIUM COMPLETO ---
 st.markdown(f"""
