@@ -66,6 +66,121 @@ def inicializar_app():
 
 inicializar_app()
 
+# --- Funciones de Dialog (Popups) ---
+
+@st.dialog("💵 Desglose de Ingresos del Mes", width="large")
+def mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes):
+    """Dialog popup para mostrar el desglose detallado de ingresos"""
+    st.info("Aquí puedes ver el detalle de todos los ingresos del mes actual.")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "💼 Ingreso Base (Nómina)",
+        f"{ingreso_base:.2f} €",
+        help="Nómina regular (del mes anterior o actual según disponibilidad)"
+    )
+
+    col2.metric(
+        "✨ Ingresos Extraordinarios",
+        f"{ingresos_extra['total']:.2f} €",
+        delta=f"{ingresos_extra['cantidad']} transacciones",
+        help="Pagas extras, devoluciones IRPF, ventas, bonificaciones, etc."
+    )
+
+    col3.metric(
+        "💵 Total Ingresos",
+        f"{total_ingresos_mes:.2f} €",
+        help="Ingreso base + extraordinarios"
+    )
+
+    # Mostrar desglose detallado si hay ingresos extraordinarios
+    if ingresos_extra['total'] > 0:
+        st.markdown("---")
+        st.markdown("**📋 Detalle de Ingresos Extraordinarios:**")
+
+        desglose = ingresos_extra['desglose']
+
+        if desglose['pagas_extras'] > 0:
+            st.caption(f"💼 Pagas extras / Nóminas adicionales: **{desglose['pagas_extras']:.2f} €**")
+
+        if desglose['irpf_bonificaciones'] > 0:
+            st.caption(f"🏦 Devoluciones IRPF / Bonificaciones: **{desglose['irpf_bonificaciones']:.2f} €**")
+
+        if desglose['otros'] > 0:
+            st.caption(f"🔄 Otros ingresos: **{desglose['otros']:.2f} €**")
+
+        if desglose['sin_clasificar'] > 0:
+            st.caption(f"❓ Sin clasificar: **{desglose['sin_clasificar']:.2f} €**")
+
+        # Mostrar lista de transacciones
+        st.markdown("---")
+        st.markdown("**📝 Lista de Transacciones:**")
+        for t in ingresos_extra['transacciones']:
+            categoria_icon = {
+                'FIJOS': '💼',
+                'EXTRAORDINARIOS': '🏦',
+                'INGRESO': '💰',
+                'SIN_CLASIFICAR': '❓'
+            }.get(t.get('categoria'), '📌')
+
+            concepto_corto = t['concepto'][:50] + "..." if len(t['concepto']) > 50 else t['concepto']
+            st.caption(f"{categoria_icon} {t['fecha']} - {concepto_corto}: **{t['importe']:.2f} €**")
+    else:
+        st.info("ℹ️ No hay ingresos extraordinarios en este mes (solo nómina regular)")
+
+
+@st.dialog("💰 Gestionar Reembolsos", width="large")
+def mostrar_modal_reembolsos(mes, año, ingreso_base):
+    """Dialog popup para gestionar y clasificar reembolsos"""
+    st.info("Selecciona los ingresos (bizums, devoluciones) que son reembolsos de gastos y márcalos como REEMBOLSO.")
+
+    # Obtener todos los ingresos del mes que NO sean ya reembolsos ni nómina
+    ingresos_sin_clasificar = [
+        t for t in db_manager.obtener_transacciones(mes=mes, año=año)
+        if t['tipo'] == 'INGRESO'
+        and t.get('categoria') not in ['REEMBOLSO', 'INGRESO']
+        and t['importe'] < ingreso_base * 0.5  # Filtrar nómina (menos de 50% del ingreso base)
+    ]
+
+    if ingresos_sin_clasificar:
+        st.write(f"**{len(ingresos_sin_clasificar)} ingresos pendientes de revisar:**")
+        st.info("💡 **Tip**: Asigna la categoría de gasto que este reembolso compensa (ej: si te devolvieron dinero de un restaurante, selecciona DISFRUTE)")
+
+        for ingreso in ingresos_sin_clasificar:
+            col1, col2, col3, col4, col5 = st.columns([1.5, 0.8, 2, 1.5, 0.8])
+
+            with col1:
+                st.text(ingreso['fecha'])
+            with col2:
+                st.text(f"{ingreso['importe']:.2f} €")
+            with col3:
+                # Mostrar concepto truncado
+                concepto = ingreso['concepto'][:30] + "..." if len(ingreso['concepto']) > 30 else ingreso['concepto']
+                st.text(concepto)
+            with col4:
+                # Dropdown de categorías de GASTO (para asignar el reembolso)
+                categoria_gasto = st.selectbox(
+                    "Categoría",
+                    options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "SIN_ASIGNAR"],
+                    key=f"cat_reembolso_{ingreso['id']}",
+                    label_visibility="collapsed"
+                )
+            with col5:
+                if st.button("✅", key=f"marcar_reembolso_{ingreso['id']}", help="Marcar como REEMBOLSO"):
+                    # Actualizar categoría a REEMBOLSO y guardar categoría de gasto asociada en notas
+                    notas_reembolso = f"REEMBOLSO_DE:{categoria_gasto}" if categoria_gasto != "SIN_ASIGNAR" else "REEMBOLSO_DE:SIN_ASIGNAR"
+
+                    db_manager.actualizar_transaccion(ingreso['id'], {
+                        'categoria': 'REEMBOLSO',
+                        'notas': notas_reembolso
+                    })
+                    st.success(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€")
+                    st.rerun()
+    else:
+        st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
+
+
 # --- CSS personalizado para mejorar UX ---
 st.markdown("""
 <style>
@@ -303,10 +418,9 @@ def mostrar_dashboard():
                             help="Suma de todos los ingresos del mes (nómina + extraordinarios)"
                         )
                     with col1_2:
-                        # Botón para ver desglose de ingresos
-                        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear
-                        if st.button("ℹ️", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="secondary"):
-                            st.session_state.mostrar_desglose_ingresos = True
+                        # Botón para ver desglose de ingresos (popup)
+                        if st.button("ℹ️", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="primary"):
+                            mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes)
 
                 with col2:
                     col2_1, col2_2 = st.columns([4, 1])
@@ -324,10 +438,9 @@ def mostrar_dashboard():
                             help=f"Gastos brutos: {gastos_brutos:.2f}€ - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
                         )
                     with col2_2:
-                        # Botón para gestionar reembolsos (más compacto)
-                        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear con métrica
+                        # Botón para gestionar reembolsos (popup)
                         if st.button("💰", key="btn_reembolsos", help="Gestionar reembolsos", type="primary"):
-                            st.session_state.mostrar_modal_reembolsos = True
+                            mostrar_modal_reembolsos(mes, año, ingreso_base)
 
                 col3, col4 = st.columns(2)
 
@@ -355,134 +468,6 @@ def mostrar_dashboard():
                 )
 
                 st.markdown("---")
-
-                # Modal de Desglose de Ingresos (aparece al hacer clic en ℹ️)
-                if st.session_state.get('mostrar_desglose_ingresos', False):
-                    st.subheader("💵 Desglose de Ingresos del Mes")
-                    st.info("Aquí puedes ver el detalle de todos los ingresos del mes actual.")
-
-                    col1, col2, col3 = st.columns(3)
-
-                    col1.metric(
-                        "💼 Ingreso Base (Nómina)",
-                        f"{ingreso_base:.2f} €",
-                        help="Nómina regular (del mes anterior o actual según disponibilidad)"
-                    )
-
-                    col2.metric(
-                        "✨ Ingresos Extraordinarios",
-                        f"{ingresos_extra['total']:.2f} €",
-                        delta=f"{ingresos_extra['cantidad']} transacciones",
-                        help="Pagas extras, devoluciones IRPF, ventas, bonificaciones, etc."
-                    )
-
-                    col3.metric(
-                        "💵 Total Ingresos",
-                        f"{total_ingresos_mes:.2f} €",
-                        help="Ingreso base + extraordinarios"
-                    )
-
-                    # Mostrar desglose detallado si hay ingresos extraordinarios
-                    if ingresos_extra['total'] > 0:
-                        st.markdown("---")
-                        st.markdown("**📋 Detalle de Ingresos Extraordinarios:**")
-
-                        desglose = ingresos_extra['desglose']
-
-                        if desglose['pagas_extras'] > 0:
-                            st.caption(f"💼 Pagas extras / Nóminas adicionales: **{desglose['pagas_extras']:.2f} €**")
-
-                        if desglose['irpf_bonificaciones'] > 0:
-                            st.caption(f"🏦 Devoluciones IRPF / Bonificaciones: **{desglose['irpf_bonificaciones']:.2f} €**")
-
-                        if desglose['otros'] > 0:
-                            st.caption(f"🔄 Otros ingresos: **{desglose['otros']:.2f} €**")
-
-                        if desglose['sin_clasificar'] > 0:
-                            st.caption(f"❓ Sin clasificar: **{desglose['sin_clasificar']:.2f} €**")
-
-                        # Mostrar lista de transacciones
-                        st.markdown("---")
-                        st.markdown("**📝 Lista de Transacciones:**")
-                        for t in ingresos_extra['transacciones']:
-                            categoria_icon = {
-                                'FIJOS': '💼',
-                                'EXTRAORDINARIOS': '🏦',
-                                'INGRESO': '💰',
-                                'SIN_CLASIFICAR': '❓'
-                            }.get(t.get('categoria'), '📌')
-
-                            concepto_corto = t['concepto'][:50] + "..." if len(t['concepto']) > 50 else t['concepto']
-                            st.caption(f"{categoria_icon} {t['fecha']} - {concepto_corto}: **{t['importe']:.2f} €**")
-                    else:
-                        st.info("ℹ️ No hay ingresos extraordinarios en este mes (solo nómina regular)")
-
-                    # Botón para cerrar el modal
-                    col_cerrar1, col_cerrar2, col_cerrar3 = st.columns([1, 1, 1])
-                    with col_cerrar2:
-                        if st.button("🔙 Cerrar", key="cerrar_desglose_ingresos", use_container_width=True):
-                            st.session_state.mostrar_desglose_ingresos = False
-                            st.rerun()
-
-                st.markdown("---")
-
-                # Modal de gestión de reembolsos
-                if st.session_state.get('mostrar_modal_reembolsos', False):
-                    st.subheader("💰 Gestionar Reembolsos")
-                    st.info("Selecciona los ingresos (bizums, devoluciones) que son reembolsos de gastos y márcalos como REEMBOLSO.")
-
-                    # Obtener todos los ingresos del mes que NO sean ya reembolsos ni nómina
-                    ingresos_sin_clasificar = [
-                        t for t in db_manager.obtener_transacciones(mes=mes, año=año)
-                        if t['tipo'] == 'INGRESO'
-                        and t.get('categoria') not in ['REEMBOLSO', 'INGRESO']
-                        and t['importe'] < ingreso_base * 0.5  # Filtrar nómina (menos de 50% del ingreso base)
-                    ]
-
-                    if ingresos_sin_clasificar:
-                        st.write(f"**{len(ingresos_sin_clasificar)} ingresos pendientes de revisar:**")
-                        st.info("💡 **Tip**: Asigna la categoría de gasto que este reembolso compensa (ej: si te devolvieron dinero de un restaurante, selecciona DISFRUTE)")
-
-                        for ingreso in ingresos_sin_clasificar:
-                            col1, col2, col3, col4, col5 = st.columns([1.5, 0.8, 2, 1.5, 0.8])
-
-                            with col1:
-                                st.text(ingreso['fecha'])
-                            with col2:
-                                st.text(f"{ingreso['importe']:.2f} €")
-                            with col3:
-                                # Mostrar concepto truncado
-                                concepto = ingreso['concepto'][:30] + "..." if len(ingreso['concepto']) > 30 else ingreso['concepto']
-                                st.text(concepto)
-                            with col4:
-                                # Dropdown de categorías de GASTO (para asignar el reembolso)
-                                categoria_gasto = st.selectbox(
-                                    "Categoría",
-                                    options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "SIN_ASIGNAR"],
-                                    key=f"cat_reembolso_{ingreso['id']}",
-                                    label_visibility="collapsed"
-                                )
-                            with col5:
-                                if st.button("✅", key=f"marcar_reembolso_{ingreso['id']}", help="Marcar como REEMBOLSO"):
-                                    # Actualizar categoría a REEMBOLSO y guardar categoría de gasto asociada en notas
-                                    notas_reembolso = f"REEMBOLSO_DE:{categoria_gasto}" if categoria_gasto != "SIN_ASIGNAR" else "REEMBOLSO_DE:SIN_ASIGNAR"
-
-                                    db_manager.actualizar_transaccion(ingreso['id'], {
-                                        'categoria': 'REEMBOLSO',
-                                        'notas': notas_reembolso
-                                    })
-                                    st.success(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€")
-                                    st.rerun()
-                    else:
-                        st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
-
-                    col_cerrar1, col_cerrar2, col_cerrar3 = st.columns([1, 1, 1])
-                    with col_cerrar2:
-                        if st.button("🔙 Cerrar", key="cerrar_modal_reembolsos", use_container_width=True):
-                            st.session_state.mostrar_modal_reembolsos = False
-                            st.rerun()
-
-                    st.markdown("---")
 
                 # Mostrar presupuestos del mes (si existen)
                 resumen_presupuestos = db_manager.obtener_resumen_presupuestos(mes, año)
