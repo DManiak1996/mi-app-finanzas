@@ -189,13 +189,25 @@ def show_premium_login(authorized_email, correct_password):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Inyectar SVG de éxito via JavaScript (bypasea sanitizer)
+                # Inyectar SVG de éxito via JavaScript con retry (bypasea sanitizer)
                 render_html(f"""
                 <script>
-                const successIcon = window.parent.document.querySelector('#success-icon-container');
-                if (successIcon) {{
-                    successIcon.innerHTML = `{brand_assets.get_icon('success')}`;
-                }}
+                (function() {{
+                    let attempts = 0;
+                    const maxAttempts = 10;
+
+                    function injectIcon() {{
+                        const successIcon = window.parent.document.querySelector('#success-icon-container');
+                        if (successIcon && !successIcon.innerHTML) {{
+                            successIcon.innerHTML = `{brand_assets.get_icon('success')}`;
+                        }} else if (attempts < maxAttempts) {{
+                            attempts++;
+                            setTimeout(injectIcon, 50);
+                        }}
+                    }}
+
+                    injectIcon();
+                }})();
                 </script>
                 """, height=0)
 
