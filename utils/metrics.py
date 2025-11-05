@@ -476,11 +476,12 @@ def obtener_ingreso_base_mes(mes, año):
     """
     Obtiene el ingreso base (nómina regular) del mes.
 
-    Estrategia mejorada para manejar casos especiales:
-    1. Busca nóminas (categoría FIJOS) en ventana temporal ampliada
-    2. Excluye EXTRAORDINARIOS (IRPF, bonificaciones)
-    3. Maneja múltiples nóminas (pagas extras) eligiendo solo la regular
-    4. Soporta nóminas tardías y casos edge (enero, febrero en marzo, etc.)
+    Estrategia mejorada con prioridad en el mes ACTUAL primero:
+    1. Busca nómina en días 20-31 del mes ACTUAL (caso más común: nómina del 29)
+    2. Busca nómina en últimos 7 días del mes ANTERIOR (para nóminas adelantadas)
+    3. Busca nómina en primeros 10 días del mes ACTUAL (para nóminas tardías)
+    4. Busca múltiples FIJOS y elige el más frecuente
+    5. Busca cualquier ingreso alto (>500€) bien clasificado
 
     Returns:
         float: Importe de la nómina regular del mes
@@ -499,8 +500,27 @@ def obtener_ingreso_base_mes(mes, año):
         mes_anterior = mes - 1
         año_anterior = año
 
-    # ESTRATEGIA 1: Buscar nómina (FIJOS) en últimos 7 días del mes anterior
-    # (ampliado de 5 a 7 para mayor flexibilidad)
+    # ESTRATEGIA 1 (PRIORITARIA): Buscar nómina en días 20-31 del mes ACTUAL
+    # Esto cubre el caso típico donde la nómina se paga el día 29-30 del mes correspondiente
+    cursor.execute("""
+        SELECT importe, fecha
+        FROM transacciones
+        WHERE tipo = 'INGRESO'
+        AND categoria = 'FIJOS'
+        AND mes = ?
+        AND año = ?
+        AND CAST(strftime('%d', fecha) AS INTEGER) >= 20
+        ORDER BY importe DESC
+        LIMIT 1
+    """, (mes, año))
+
+    resultado = cursor.fetchone()
+    if resultado and resultado['importe']:
+        conn.close()
+        return resultado['importe']
+
+    # ESTRATEGIA 2: Buscar nómina en últimos 7 días del mes ANTERIOR
+    # Fallback para casos donde la nómina se adelanta (ej: pagada 28-31 del mes anterior)
     ultimo_dia_mes_anterior = calendar.monthrange(año_anterior, mes_anterior)[1]
 
     cursor.execute("""
@@ -520,8 +540,8 @@ def obtener_ingreso_base_mes(mes, año):
         conn.close()
         return resultado['importe']
 
-    # ESTRATEGIA 2: Buscar nómina en primeros 10 días del mes actual
-    # (para nóminas tardías como febrero pagada en marzo)
+    # ESTRATEGIA 3: Buscar nómina en primeros 10 días del mes ACTUAL
+    # Para nóminas tardías (ej: febrero pagada el 5 de marzo)
     cursor.execute("""
         SELECT importe, fecha
         FROM transacciones
@@ -539,7 +559,7 @@ def obtener_ingreso_base_mes(mes, año):
         conn.close()
         return resultado['importe']
 
-    # ESTRATEGIA 3: Si hay múltiples FIJOS en el mes (pagas extras),
+    # ESTRATEGIA 4: Si hay múltiples FIJOS en el mes (pagas extras),
     # tomar el más frecuente o el primero cronológicamente
     cursor.execute("""
         SELECT importe, COUNT(*) as frecuencia, MIN(fecha) as primera_fecha
@@ -558,8 +578,8 @@ def obtener_ingreso_base_mes(mes, año):
         conn.close()
         return resultado['importe']
 
-    # ESTRATEGIA 4: Buscar cualquier ingreso alto (>500€) que no sea EXTRAORDINARIOS
-    # (para casos donde la nómina no está bien clasificada)
+    # ESTRATEGIA 5: Buscar cualquier ingreso alto (>500€) que no sea EXTRAORDINARIOS
+    # Para casos donde la nómina no está bien clasificada
     cursor.execute("""
         SELECT MAX(importe) as max_ingreso
         FROM transacciones
@@ -577,7 +597,6 @@ def obtener_ingreso_base_mes(mes, año):
         return resultado['max_ingreso']
 
     # FALLBACK: Devolver 0 si no se encuentra nada
-    # (mejor que sumar todo, evita errores en meses sin nómina)
     conn.close()
     return 0.0
 

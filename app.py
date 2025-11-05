@@ -356,15 +356,15 @@ def mostrar_dashboard():
 
                 st.markdown("---")
 
-                # Desglose de Ingresos del Mes
-                with st.expander("💰 Desglose de Ingresos del Mes", expanded=False):
-                    ingresos_extra = metrics.obtener_ingresos_extraordinarios_mes(mes, año)
-                    total_ingresos_mes = ingreso_base + ingresos_extra['total']
+                # Modal de Desglose de Ingresos (aparece al hacer clic en ℹ️)
+                if st.session_state.get('mostrar_desglose_ingresos', False):
+                    st.subheader("💵 Desglose de Ingresos del Mes")
+                    st.info("Aquí puedes ver el detalle de todos los ingresos del mes actual.")
 
                     col1, col2, col3 = st.columns(3)
 
                     col1.metric(
-                        "💼 Ingreso Base",
+                        "💼 Ingreso Base (Nómina)",
                         f"{ingreso_base:.2f} €",
                         help="Nómina regular (del mes anterior o actual según disponibilidad)"
                     )
@@ -377,14 +377,15 @@ def mostrar_dashboard():
                     )
 
                     col3.metric(
-                        "💵 Total Ingresos Mes",
+                        "💵 Total Ingresos",
                         f"{total_ingresos_mes:.2f} €",
                         help="Ingreso base + extraordinarios"
                     )
 
                     # Mostrar desglose detallado si hay ingresos extraordinarios
                     if ingresos_extra['total'] > 0:
-                        st.markdown("**Detalle de Ingresos Extraordinarios:**")
+                        st.markdown("---")
+                        st.markdown("**📋 Detalle de Ingresos Extraordinarios:**")
 
                         desglose = ingresos_extra['desglose']
 
@@ -401,7 +402,8 @@ def mostrar_dashboard():
                             st.caption(f"❓ Sin clasificar: **{desglose['sin_clasificar']:.2f} €**")
 
                         # Mostrar lista de transacciones
-                        st.markdown("**Transacciones:**")
+                        st.markdown("---")
+                        st.markdown("**📝 Lista de Transacciones:**")
                         for t in ingresos_extra['transacciones']:
                             categoria_icon = {
                                 'FIJOS': '💼',
@@ -413,7 +415,14 @@ def mostrar_dashboard():
                             concepto_corto = t['concepto'][:50] + "..." if len(t['concepto']) > 50 else t['concepto']
                             st.caption(f"{categoria_icon} {t['fecha']} - {concepto_corto}: **{t['importe']:.2f} €**")
                     else:
-                        st.info("No hay ingresos extraordinarios en este mes")
+                        st.info("ℹ️ No hay ingresos extraordinarios en este mes (solo nómina regular)")
+
+                    # Botón para cerrar el modal
+                    col_cerrar1, col_cerrar2, col_cerrar3 = st.columns([1, 1, 1])
+                    with col_cerrar2:
+                        if st.button("🔙 Cerrar", key="cerrar_desglose_ingresos", use_container_width=True):
+                            st.session_state.mostrar_desglose_ingresos = False
+                            st.rerun()
 
                 st.markdown("---")
 
