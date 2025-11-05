@@ -3,6 +3,7 @@
 import streamlit as st
 from database import db_manager
 from utils import metrics, visualizer, excel_reader, categorizer, sync, coche_electrico, config_manager
+from utils.design_tokens import Colors, Typography, Spacing, BorderRadius, get_budget_color, spacer_html
 import datetime
 import pandas as pd
 import json
@@ -175,144 +176,158 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
                         'categoria': 'REEMBOLSO',
                         'notas': notas_reembolso
                     })
-                    # Marcar flag para reabrir el modal después del rerun
-                    st.session_state.reabrir_modal_reembolsos = True
-                    st.session_state.mes_modal_reembolsos = mes
-                    st.session_state.año_modal_reembolsos = año
-                    st.toast(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€", icon="✅")
+                    st.toast(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€ procesado correctamente", icon="✅")
                     st.rerun()
     else:
         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
 
 
-# --- CSS personalizado para mejorar UX ---
-st.markdown("""
+# --- CSS personalizado con Design System ---
+st.markdown(f"""
 <style>
-/* ========== MEJORAS GENERALES ========== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* Botones más grandes para mejor usabilidad móvil (WCAG AAA: 44x44px mínimo) */
-.stButton button {
+/* ========== SISTEMA TIPOGRÁFICO ========== */
+html, body, [class*="css"] {{
+    font-family: {Typography.FONT_PRIMARY} !important;
+}}
+
+h1 {{
+    font-size: {Typography.TEXT_4XL} !important;
+    font-weight: {Typography.WEIGHT_BOLD} !important;
+    line-height: {Typography.LEADING_TIGHT} !important;
+    letter-spacing: {Typography.TRACKING_TIGHT} !important;
+    color: {Colors.GRAY_900} !important;
+    margin-bottom: {Spacing.LG} !important;
+}}
+
+h2 {{
+    font-size: {Typography.TEXT_3XL} !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    line-height: {Typography.LEADING_SNUG} !important;
+    color: {Colors.GRAY_900} !important;
+    margin-bottom: {Spacing.BASE} !important;
+}}
+
+h3 {{
+    font-size: {Typography.TEXT_2XL} !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    line-height: {Typography.LEADING_NORMAL} !important;
+    color: {Colors.GRAY_900} !important;
+    margin-bottom: {Spacing.MD} !important;
+}}
+
+p, .stMarkdown, div[data-testid="stText"] {{
+    font-size: {Typography.TEXT_BASE} !important;
+    line-height: {Typography.LEADING_RELAXED} !important;
+    color: {Colors.GRAY_900} !important;
+}}
+
+label, .stMarkdown small, caption {{
+    font-size: {Typography.TEXT_SM} !important;
+    font-weight: {Typography.WEIGHT_MEDIUM} !important;
+    color: {Colors.GRAY_700} !important;
+}}
+
+/* ========== BOTONES ========== */
+.stButton button {{
     min-height: 44px !important;
-    padding: 12px 24px !important;
-    font-size: 16px !important;
-}
+    padding: {Spacing.MD} {Spacing.LG} !important;
+    font-size: {Typography.TEXT_BASE} !important;
+    border-radius: {BorderRadius.BASE} !important;
+    font-weight: {Typography.WEIGHT_MEDIUM} !important;
+    transition: all 0.2s ease !important;
+}}
 
-/* Form submit buttons aún más prominentes */
-.stButton button[kind="primary"] {
+.stButton button[kind="primary"] {{
     min-height: 48px !important;
-    font-weight: 600 !important;
-}
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    background-color: {Colors.PRIMARY} !important;
+    box-shadow: {Colors.SHADOW_SM} !important;
+}}
 
-/* Mejorar inputs en móvil */
-.stTextInput input, .stNumberInput input, .stSelectbox select {
+.stButton button[kind="primary"]:hover {{
+    transform: translateY(-2px) !important;
+    box-shadow: {Colors.SHADOW_MD} !important;
+}}
+
+.stButton button[kind="secondary"] {{
+    border: 1px solid {Colors.GRAY_300} !important;
+}}
+
+/* ========== INPUTS ========== */
+.stTextInput input, .stNumberInput input, .stSelectbox select {{
     min-height: 44px !important;
-    font-size: 16px !important; /* Previene zoom automático en iOS */
-}
+    font-size: {Typography.TEXT_BASE} !important;
+    border-radius: {BorderRadius.SM} !important;
+    border-color: {Colors.GRAY_300} !important;
+}}
 
-/* Mejorar legibilidad de métricas - Fondo claro siempre */
-.stMetric {
-    padding: 12px !important;
-    border-radius: 8px !important;
-}
+/* ========== MÉTRICAS ========== */
+.stMetric {{
+    background: {Colors.GRADIENT_PRIMARY} !important;
+    padding: {Spacing.LG} !important;
+    border-radius: {BorderRadius.BASE} !important;
+    border: 1px solid {Colors.GRAY_200} !important;
+    box-shadow: {Colors.SHADOW_SM} !important;
+}}
 
-/* Asegurar que el valor de las métricas sea visible */
-.stMetric [data-testid="stMetricValue"] {
-    color: #262730 !important;
-}
+.stMetric label {{
+    font-size: {Typography.TEXT_SM} !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    text-transform: uppercase !important;
+    letter-spacing: {Typography.TRACKING_WIDER} !important;
+    color: {Colors.GRAY_700} !important;
+}}
 
-.stMetric label {
-    color: #31333F !important;
-}
+.stMetric [data-testid="stMetricValue"] {{
+    font-size: {Typography.TEXT_4XL} !important;
+    font-weight: {Typography.WEIGHT_BOLD} !important;
+    line-height: {Typography.LEADING_NONE} !important;
+    color: {Colors.GRAY_900} !important;
+    font-feature-settings: 'tnum' 1 !important;
+}}
+
+.stMetric [data-testid="stMetricDelta"] {{
+    font-size: {Typography.TEXT_SM} !important;
+    font-weight: {Typography.WEIGHT_MEDIUM} !important;
+}}
 
 /* ========== RESPONSIVE MÓVIL ========== */
+@media (max-width: 768px) {{
+    .main .block-container {{
+        padding-left: {Spacing.BASE} !important;
+        padding-right: {Spacing.BASE} !important;
+    }}
 
-/* Pantallas móviles (menor a 768px) */
-@media (max-width: 768px) {
-    /* Aumentar padding general para mejor toque */
-    .main .block-container {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
+    h1 {{ font-size: {Typography.TEXT_3XL} !important; }}
+    h2 {{ font-size: {Typography.TEXT_2XL} !important; }}
+    h3 {{ font-size: {Typography.TEXT_XL} !important; }}
 
-    /* Títulos más pequeños en móvil */
-    h1 {
-        font-size: 1.75rem !important;
-    }
+    .stMetric [data-testid="stMetricValue"] {{
+        font-size: {Typography.TEXT_2XL} !important;
+    }}
 
-    h2 {
-        font-size: 1.5rem !important;
-    }
+    .stTabs [data-baseweb="tab"] {{
+        padding: {Spacing.SM} {Spacing.MD} !important;
+        font-size: {Typography.TEXT_SM} !important;
+    }}
 
-    h3 {
-        font-size: 1.25rem !important;
-    }
-
-    /* Métricas más compactas en móvil */
-    .stMetric label {
-        font-size: 0.875rem !important;
-    }
-
-    .stMetric [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
-    }
-
-    /* Radio buttons horizontales más pequeños */
-    .stRadio > div {
-        gap: 0.5rem !important;
-    }
-
-    /* Tabs más compactos */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0.25rem !important;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        padding: 8px 12px !important;
-        font-size: 0.875rem !important;
-    }
-
-    /* DataFrames con scroll horizontal suave */
-    .stDataFrame {
+    .stDataFrame {{
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
-    }
+    }}
+}}
 
-    /* Formularios en columna única en móvil */
-    .row-widget.stHorizontal {
-        flex-direction: column !important;
-    }
+@media (max-width: 480px) {{
+    h1 {{ font-size: {Typography.TEXT_2XL} !important; }}
+    .stButton button {{ width: 100% !important; }}
+    .stMetric {{ min-width: 100% !important; }}
+}}
 
-    /* Sidebar más estrecho */
-    [data-testid="stSidebar"] {
-        min-width: 250px !important;
-    }
-}
-
-/* Pantallas muy pequeñas (menor a 480px - iPhone SE, etc) */
-@media (max-width: 480px) {
-    h1 {
-        font-size: 1.5rem !important;
-    }
-
-    /* Métricas en formato vertical */
-    .stMetric {
-        min-width: 100% !important;
-    }
-
-    /* Botones full-width en móvil pequeño */
-    .stButton button {
-        width: 100% !important;
-    }
-}
-
-/* ========== MEJORAS PARA TABLET ========== */
-
-/* Tablets (768px - 1024px) */
-@media (min-width: 768px) and (max-width: 1024px) {
-    .main .block-container {
-        max-width: 95% !important;
-    }
-}
+@media (min-width: 768px) and (max-width: 1024px) {{
+    .main .block-container {{ max-width: 95% !important; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -437,20 +452,13 @@ def mostrar_dashboard():
                         help_text += f" = Netos: {gastos_netos:.2f}€ (sin reembolsos este mes)"
 
                     st.metric(
-                        "💸 Gastos Netos",
-                        f"{gastos_netos:.2f} €",
+                        "💸 Gastos del Mes",
+                        f"{abs(gastos_netos):.2f} €",  # Valor absoluto para claridad
                         help=help_text
                     )
                     # Botón para gestionar reembolsos (popup) - pegado debajo de la métrica
                     if st.button("💰 Reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="primary"):
                         mostrar_modal_reembolsos(mes, año, ingreso_base)
-
-                    # Reabrir modal automáticamente si se procesó un reembolso
-                    if st.session_state.get('reabrir_modal_reembolsos', False):
-                        mes_modal = st.session_state.get('mes_modal_reembolsos', mes)
-                        año_modal = st.session_state.get('año_modal_reembolsos', año)
-                        st.session_state.reabrir_modal_reembolsos = False
-                        mostrar_modal_reembolsos(mes_modal, año_modal, ingreso_base)
 
                 col3, col4 = st.columns(2)
 
@@ -493,16 +501,8 @@ def mostrar_dashboard():
                         gastado_bruto = presupuesto.get('gastado_bruto', gastado)
                         reembolsos = presupuesto.get('reembolsos_asignados', 0)
 
-                        # Determinar color según porcentaje usado
-                        if porcentaje < 70:
-                            color = "🟢"
-                            barra_color = "#26a69a"
-                        elif porcentaje < 90:
-                            color = "🟡"
-                            barra_color = "#ff9800"
-                        else:
-                            color = "🔴"
-                            barra_color = "#ef5350"
+                        # Determinar color según porcentaje usado (usando design system)
+                        color, barra_color, _ = get_budget_color(porcentaje)
 
                         with st.container():
                             col1, col2, col3 = st.columns([3, 1, 1])
@@ -638,16 +638,16 @@ def mostrar_dashboard():
                         y=df_completo['saldo_disponible'],
                         mode='lines+markers',
                         name='Saldo',
-                        line=dict(color='#1f77b4', width=2.5),
+                        line=dict(color=Colors.PRIMARY, width=2.5),
                         marker=dict(
                             size=8,
                             color=df_completo['saldo_disponible'],
-                            colorscale=[[0, '#ef5350'], [0.5, '#ff9800'], [1, '#26a69a']],
+                            colorscale=[[0, Colors.ERROR], [0.5, Colors.WARNING], [1, Colors.SUCCESS]],
                             showscale=False,
                             line=dict(width=1, color='white')
                         ),
                         fill='tonexty',
-                        fillcolor='rgba(31, 119, 180, 0.1)',
+                        fillcolor=f'rgba(31, 119, 180, 0.1)',
                         hovertemplate='<b>%{x}</b><br>Saldo: %{y:.2f} €<extra></extra>'
                     ))
 
