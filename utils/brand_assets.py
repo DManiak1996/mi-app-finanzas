@@ -6,47 +6,47 @@ Incluye SVGs inline para logo, iconos y patterns
 
 # === LOGO PRINCIPAL ===
 LOGO_SVG = """
-<svg width="180" height="48" viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    
+<svg width="240" height="64" viewBox="0 0 240 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+
     <defs>
         <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+            <stop offset="0%" style="stop-color:#0a4c3e;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#84cc16;stop-opacity:1" />
         </linearGradient>
         <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#f6d365;stop-opacity:1" />
-            <stop offset="50%" style="stop-color:#fda085;stop-opacity:1" />
+            <stop offset="0%" style="stop-color:#84cc16;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#a3e635;stop-opacity:1" />
         </linearGradient>
     </defs>
 
-    <g transform="translate(4, 4)">
-        
-        <circle cx="20" cy="20" r="18" fill="url(#logoGradient)" opacity="0.1"/>
-        <circle cx="20" cy="20" r="18" stroke="url(#logoGradient)" stroke-width="2.5" fill="none"/>
+    <g transform="translate(6, 6)">
 
-        <path d="M 10 25 L 15 20 L 20 18 L 25 12 L 30 10"
+        <circle cx="26" cy="26" r="24" fill="url(#logoGradient)" opacity="0.1"/>
+        <circle cx="26" cy="26" r="24" stroke="url(#logoGradient)" stroke-width="3" fill="none"/>
+
+        <path d="M 13 33 L 20 26 L 26 24 L 33 16 L 40 13"
               stroke="url(#logoGradient)"
-              stroke-width="2.5"
+              stroke-width="3"
               stroke-linecap="round"
               stroke-linejoin="round"
               fill="none"/>
 
-        <circle cx="15" cy="20" r="2.5" fill="url(#accentGradient)"/>
-        <circle cx="20" cy="18" r="2.5" fill="url(#accentGradient)"/>
-        <circle cx="25" cy="12" r="2.5" fill="url(#accentGradient)"/>
-        <circle cx="30" cy="10" r="3" fill="url(#accentGradient)"/>
+        <circle cx="20" cy="26" r="3.5" fill="url(#accentGradient)"/>
+        <circle cx="26" cy="24" r="3.5" fill="url(#accentGradient)"/>
+        <circle cx="33" cy="16" r="3.5" fill="url(#accentGradient)"/>
+        <circle cx="40" cy="13" r="4" fill="url(#accentGradient)"/>
     </g>
 
-    <text x="54" y="20"
+    <text x="70" y="28"
           font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-          font-size="18"
+          font-size="22"
           font-weight="700"
-          fill="#262730">
+          fill="#0a4c3e">
         FinanzasFlow
     </text>
-    <text x="54" y="36"
+    <text x="70" y="46"
           font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-          font-size="9"
+          font-size="11"
           font-weight="500"
           fill="#757575"
           letter-spacing="0.5">
@@ -179,8 +179,8 @@ DECORATION_SUCCESS = """
 <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
         <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#11998e"/>
-            <stop offset="100%" style="stop-color:#38ef7d"/>
+            <stop offset="0%" style="stop-color:#0d5f4e"/>
+            <stop offset="100%" style="stop-color:#a3e635"/>
         </linearGradient>
     </defs>
     <circle cx="60" cy="60" r="50" fill="url(#successGrad)" opacity="0.1"/>

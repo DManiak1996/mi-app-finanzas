@@ -100,9 +100,9 @@ class Colors:
     GRADIENT_ERROR = f"linear-gradient(135deg, {ERROR_ULTRA_LIGHT} 0%, {ERROR_LIGHT}30 100%)"
 
     # === 🎨 FINTECH PREMIUM PALETTE ===
-    # Gradientes vibrantes para UI premium
-    PREMIUM_PRIMARY_START = "#667eea"      # Azul-violeta brillante
-    PREMIUM_PRIMARY_END = "#764ba2"        # Violeta profundo
+    # Gradientes vibrantes para UI premium - Tema Verde Oscuro a Lima
+    PREMIUM_PRIMARY_START = "#0a4c3e"      # Verde oscuro profundo (90%)
+    PREMIUM_PRIMARY_END = "#84cc16"        # Verde lima brillante (10%)
     PREMIUM_GRADIENT_PRIMARY = f"linear-gradient(135deg, {PREMIUM_PRIMARY_START} 0%, {PREMIUM_PRIMARY_END} 100%)"
 
     # Gradientes de acento
@@ -110,8 +110,8 @@ class Colors:
     PREMIUM_GOLD_END = "#fda085"           # Coral-naranja
     PREMIUM_GRADIENT_GOLD = f"linear-gradient(135deg, {PREMIUM_GOLD_START} 0%, {PREMIUM_GOLD_END} 100%)"
 
-    PREMIUM_TEAL_START = "#11998e"         # Verde menta profundo
-    PREMIUM_TEAL_END = "#38ef7d"           # Verde menta brillante
+    PREMIUM_TEAL_START = "#0d5f4e"         # Verde bosque profundo
+    PREMIUM_TEAL_END = "#a3e635"           # Lima vibrante
     PREMIUM_GRADIENT_TEAL = f"linear-gradient(135deg, {PREMIUM_TEAL_START} 0%, {PREMIUM_TEAL_END} 100%)"
 
     PREMIUM_CORAL_START = "#fa709a"        # Rosa coral
@@ -122,9 +122,9 @@ class Colors:
     PREMIUM_SKY_END = "#00f2fe"            # Cyan brillante
     PREMIUM_GRADIENT_SKY = f"linear-gradient(135deg, {PREMIUM_SKY_START} 0%, {PREMIUM_SKY_END} 100%)"
 
-    # Gradiente de fondo sutil
-    PREMIUM_BG_GRADIENT = "linear-gradient(180deg, #ffffff 0%, #f8f9fe 100%)"
-    PREMIUM_CARD_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #f5f7ff 100%)"
+    # Gradiente de fondo sutil - tema verde
+    PREMIUM_BG_GRADIENT = "linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)"
+    PREMIUM_CARD_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #f7fee7 100%)"
 
     # === 💎 GLASSMORPHISM ===
     GLASS_BG = "rgba(255, 255, 255, 0.7)"
@@ -149,10 +149,10 @@ class Colors:
     SHADOW_PREMIUM_2XL = """0 25px 50px rgba(0,0,0,0.15),
                             0 12px 25px rgba(0,0,0,0.08)"""
 
-    # Sombras con color (glow effects)
-    SHADOW_GLOW_PRIMARY = "0 0 20px rgba(102, 126, 234, 0.4)"    # #667eea con alpha
-    SHADOW_GLOW_SUCCESS = "0 0 20px rgba(17, 153, 142, 0.4)"     # #11998e con alpha
-    SHADOW_GLOW_ERROR = "0 0 20px rgba(250, 112, 154, 0.4)"      # #fa709a con alpha
+    # Sombras con color (glow effects) - tema verde
+    SHADOW_GLOW_PRIMARY = "0 0 20px rgba(10, 76, 62, 0.4)"      # Verde oscuro con alpha
+    SHADOW_GLOW_SUCCESS = "0 0 20px rgba(13, 95, 78, 0.4)"      # Verde bosque con alpha
+    SHADOW_GLOW_ERROR = "0 0 20px rgba(250, 112, 154, 0.4)"     # #fa709a con alpha
 
     # === 🎯 ACENTOS PREMIUM ===
     ACCENT_GOLD = PREMIUM_GOLD_START       # Para highlights especiales

@@ -210,7 +210,7 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
 # --- LOGO PREMIUM EN HEADER ---
 # No usar f-string con el SVG para evitar escape - usar componente HTML para bypass sanitizer
 header_html = f"""
-<div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(102, 126, 234, 0.1);">
+<div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(10, 76, 62, 0.1);">
     <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG};">
         <div id="header-logo-container"></div>
     </div>
@@ -286,7 +286,7 @@ div[data-testid="column"] > div {{
     border-radius: {BorderRadius.LG} !important;
     padding: {Spacing.LG} !important;
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
-    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+    border: 1px solid rgba(10, 76, 62, 0.08) !important;
     backdrop-filter: blur(10px) !important;
     transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
 }}
@@ -294,7 +294,7 @@ div[data-testid="column"] > div {{
 div[data-testid="column"] > div:hover {{
     transform: translateY(-4px) !important;
     box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
-    border-color: rgba(102, 126, 234, 0.15) !important;
+    border-color: rgba(10, 76, 62, 0.15) !important;
 }}
 
 /* === 🎯 MÉTRICAS PREMIUM === */
@@ -302,7 +302,7 @@ div[data-testid="column"] > div:hover {{
     background: {Colors.PREMIUM_CARD_GRADIENT} !important;
     padding: {Spacing.XL} !important;
     border-radius: {BorderRadius.LG} !important;
-    border: 1px solid rgba(102, 126, 234, 0.1) !important;
+    border: 1px solid rgba(10, 76, 62, 0.1) !important;
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
     backdrop-filter: blur(10px) !important;
     position: relative !important;
@@ -313,7 +313,7 @@ div[data-testid="column"] > div:hover {{
 .stMetric:hover {{
     transform: translateY(-2px) scale(1.02) !important;
     box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
-    border-color: rgba(102, 126, 234, 0.2) !important;
+    border-color: rgba(10, 76, 62, 0.2) !important;
 }}
 
 .stMetric::before {{
@@ -352,7 +352,7 @@ div[data-testid="column"] > div:hover {{
     font-weight: {Typography.WEIGHT_MEDIUM} !important;
     padding: {Spacing.XS} {Spacing.MD} !important;
     border-radius: {BorderRadius.FULL} !important;
-    background: rgba(102, 126, 234, 0.08) !important;
+    background: rgba(10, 76, 62, 0.08) !important;
     display: inline-block !important;
 }}
 
@@ -406,13 +406,13 @@ div[data-testid="column"] > div:hover {{
 
 .stButton button[kind="secondary"] {{
     background: white !important;
-    border: 2px solid rgba(102, 126, 234, 0.2) !important;
+    border: 2px solid rgba(10, 76, 62, 0.2) !important;
     color: {Colors.PREMIUM_PRIMARY_START} !important;
 }}
 
 .stButton button[kind="secondary"]:hover {{
-    background: rgba(102, 126, 234, 0.05) !important;
-    border-color: rgba(102, 126, 234, 0.4) !important;
+    background: rgba(10, 76, 62, 0.05) !important;
+    border-color: rgba(10, 76, 62, 0.4) !important;
     transform: translateY(-2px) !important;
 }}
 
@@ -422,7 +422,7 @@ div[data-testid="column"] > div:hover {{
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
     background: {Colors.PREMIUM_CARD_GRADIENT} !important;
     padding: {Spacing.LG} !important;
-    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+    border: 1px solid rgba(10, 76, 62, 0.08) !important;
     backdrop-filter: blur(10px) !important;
     transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
 }}
@@ -437,7 +437,7 @@ div[data-testid="column"] > div:hover {{
     min-height: 48px !important;
     font-size: {Typography.TEXT_BASE} !important;
     border-radius: {BorderRadius.MD} !important;
-    border: 2px solid rgba(102, 126, 234, 0.15) !important;
+    border: 2px solid rgba(10, 76, 62, 0.15) !important;
     background: white !important;
     box-shadow: {Colors.SHADOW_PREMIUM_XS} !important;
     transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
@@ -446,7 +446,7 @@ div[data-testid="column"] > div:hover {{
 
 .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus {{
     border-color: {Colors.PREMIUM_PRIMARY_START} !important;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1), {Colors.SHADOW_PREMIUM_SM} !important;
+    box-shadow: 0 0 0 3px rgba(10, 76, 62, 0.1), {Colors.SHADOW_PREMIUM_SM} !important;
     outline: none !important;
 }}
 
@@ -469,7 +469,7 @@ div[data-testid="column"] > div:hover {{
 }}
 
 .stTabs [data-baseweb="tab"]:hover {{
-    background: rgba(102, 126, 234, 0.08) !important;
+    background: rgba(10, 76, 62, 0.08) !important;
     color: {Colors.PREMIUM_PRIMARY_START} !important;
 }}
 
@@ -484,7 +484,7 @@ div[data-testid="column"] > div:hover {{
     border-radius: {BorderRadius.LG} !important;
     overflow: hidden !important;
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
-    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+    border: 1px solid rgba(10, 76, 62, 0.08) !important;
 }}
 
 .stDataFrame thead tr th {{
@@ -502,7 +502,7 @@ div[data-testid="column"] > div:hover {{
 }}
 
 .stDataFrame tbody tr:hover {{
-    background: rgba(102, 126, 234, 0.05) !important;
+    background: rgba(10, 76, 62, 0.05) !important;
     transform: scale(1.01) !important;
 }}
 
@@ -552,7 +552,7 @@ div[data-testid="stModal"] > div {{
 /* === 🎪 SIDEBAR PREMIUM === */
 section[data-testid="stSidebar"] {{
     background: {Colors.PREMIUM_CARD_GRADIENT} !important;
-    border-right: 1px solid rgba(102, 126, 234, 0.1) !important;
+    border-right: 1px solid rgba(10, 76, 62, 0.1) !important;
     box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
 }}
 
@@ -568,7 +568,7 @@ section[data-testid="stSidebar"] .stRadio label {{
 }}
 
 section[data-testid="stSidebar"] .stRadio label:hover {{
-    background: rgba(102, 126, 234, 0.08) !important;
+    background: rgba(10, 76, 62, 0.08) !important;
     transform: translateX(4px) !important;
 }}
 
@@ -676,7 +676,7 @@ html {{
 }}
 
 ::-webkit-scrollbar-track {{
-    background: rgba(102, 126, 234, 0.05) !important;
+    background: rgba(10, 76, 62, 0.05) !important;
     border-radius: {BorderRadius.FULL} !important;
 }}
 
@@ -712,7 +712,7 @@ html {{
     border-radius: {BorderRadius.LG} !important;
     padding: {Spacing.XL} !important;
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
-    border: 1px solid rgba(102, 126, 234, 0.1) !important;
+    border: 1px solid rgba(10, 76, 62, 0.1) !important;
 }}
 </style>
 """, unsafe_allow_html=True)
