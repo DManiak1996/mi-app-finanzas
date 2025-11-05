@@ -420,7 +420,7 @@ def mostrar_dashboard():
                         help="Suma de todos los ingresos del mes (nómina + extraordinarios)"
                     )
                     # Botón para ver desglose de ingresos (popup) - pegado debajo de la métrica
-                    if st.button("ℹ️ Ver desglose", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="secondary"):
+                    if st.button("ℹ️ Ver desglose", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="primary"):
                         mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes)
 
                 with col2:
@@ -442,7 +442,7 @@ def mostrar_dashboard():
                         help=help_text
                     )
                     # Botón para gestionar reembolsos (popup) - pegado debajo de la métrica
-                    if st.button("💰 Reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="secondary"):
+                    if st.button("💰 Reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="primary"):
                         mostrar_modal_reembolsos(mes, año, ingreso_base)
 
                     # Reabrir modal automáticamente si se procesó un reembolso
