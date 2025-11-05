@@ -206,15 +206,17 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
     else:
         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
 
-# --- CSS FINTECH PREMIUM COMPLETO ---
+# --- LOGO PREMIUM EN HEADER ---
 st.markdown(f"""
-<!-- Logo Premium en Header -->
 <div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(102, 126, 234, 0.1);">
     <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG};">
         {brand_assets.LOGO_SVG}
     </div>
 </div>
+""", unsafe_allow_html=True)
 
+# --- CSS FINTECH PREMIUM COMPLETO ---
+st.markdown(f"""
 <style>
 /* ========== 🎨 FINTECH PREMIUM CSS ========== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
