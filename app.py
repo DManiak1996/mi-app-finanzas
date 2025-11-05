@@ -420,7 +420,7 @@ def mostrar_dashboard():
                         help="Suma de todos los ingresos del mes (nómina + extraordinarios)"
                     )
                     # Botón para ver desglose de ingresos (popup) - pegado debajo de la métrica
-                    if st.button("ℹ️ Ver desglose detallado", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="primary", use_container_width=True):
+                    if st.button("ℹ️ Ver desglose", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="secondary"):
                         mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes)
 
                 with col2:
@@ -429,15 +429,20 @@ def mostrar_dashboard():
                     reembolsos = datos_mes['total_reembolsos']
                     gastos_netos = abs(datos_mes['gastos_netos'])
 
+                    # Construir texto del help con información de reembolsos
+                    help_text = f"Gastos brutos: {gastos_brutos:.2f}€"
+                    if reembolsos > 0:
+                        help_text += f" - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
+                    else:
+                        help_text += f" = Netos: {gastos_netos:.2f}€ (sin reembolsos este mes)"
+
                     st.metric(
                         "💸 Gastos Netos",
                         f"{gastos_netos:.2f} €",
-                        delta=f"-{reembolsos:.2f} € reembolsados" if reembolsos > 0 else None,
-                        delta_color="normal",
-                        help=f"Gastos brutos: {gastos_brutos:.2f}€ - Reembolsos: {reembolsos:.2f}€ = Netos: {gastos_netos:.2f}€"
+                        help=help_text
                     )
                     # Botón para gestionar reembolsos (popup) - pegado debajo de la métrica
-                    if st.button("💰 Gestionar reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="primary", use_container_width=True):
+                    if st.button("💰 Reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="secondary"):
                         mostrar_modal_reembolsos(mes, año, ingreso_base)
 
                     # Reabrir modal automáticamente si se procesó un reembolso
