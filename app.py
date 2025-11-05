@@ -527,7 +527,7 @@ def mostrar_dashboard():
                     st.subheader("📊 Distribución de Gastos")
                     fig = visualizer.grafico_distribucion_gastos(datos_mes['gastos_por_categoria'])
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, key="plot_gastos_mes")
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_gastos_mes_{mes}_{año}")
                     else:
                         st.info("Sin datos de gastos")
 
@@ -669,7 +669,7 @@ def mostrar_dashboard():
                         )
                     )
 
-                    st.plotly_chart(fig, use_container_width=True, key="plot_evolucion_saldo_mes")
+                    st.plotly_chart(fig, use_container_width=True, key=f"plot_evolucion_saldo_mes_{mes}_{año}")
 
                     # Estadísticas del mes - Layout responsive (2x2)
                     col1, col2 = st.columns(2)
@@ -749,13 +749,13 @@ def mostrar_dashboard():
                         st.markdown("### 📈 Evolución Mensual")
                         fig = visualizer.grafico_evolucion_anual(datos_anuales['evolucion_mensual'], NOMBRES_MESES)
                         if fig:
-                            st.plotly_chart(fig, use_container_width=True, key="plot_evolucion_anual")
+                            st.plotly_chart(fig, use_container_width=True, key=f"plot_evolucion_anual_{año}")
 
                     with col2:
                         st.markdown("### 📊 Distribución Anual")
                         fig = visualizer.grafico_distribucion_gastos(datos_anuales['gastos_por_categoria'])
                         if fig:
-                            st.plotly_chart(fig, use_container_width=True, key="plot_distribucion_anual")
+                            st.plotly_chart(fig, use_container_width=True, key=f"plot_distribucion_anual_{año}")
                 else:
                     st.info(f"No hay datos para el año {año}")
 
@@ -1002,7 +1002,7 @@ def mostrar_dashboard():
         fig = visualizer.grafico_evolucion_mensual(df_evol)
 
         if fig:
-            st.plotly_chart(fig, use_container_width=True, key="plot_historico_mensual")
+            st.plotly_chart(fig, use_container_width=True, key=f"plot_historico_mensual_{año}")
 
             # Estadísticas del histórico
             if not df_evol.empty:
@@ -1478,45 +1478,73 @@ def mostrar_sincronizacion():
         if es_local:
             st.info("🏠 **Modo Local Detectado** - Puedes guardar directamente en tu carpeta de iCloud")
 
+        # Inicializar session_state para mantener el JSON generado
+        if 'json_exportacion' not in st.session_state:
+            st.session_state.json_exportacion = None
+            st.session_state.filename_exportacion = None
+
         if st.button("📥 Generar Archivo de Exportación", type="primary"):
             with st.spinner("Generando archivo..."):
                 json_export = sync.generar_json_exportacion()
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"finanzas_export_{timestamp}.json"
 
-                # Opción 1: Guardado directo en local (solo si está en Mac de Daniel)
-                if es_local:
-                    col_save1, col_save2 = st.columns(2)
+                # Guardar en session_state para mantenerlo entre reruns
+                st.session_state.json_exportacion = json_export
+                st.session_state.filename_exportacion = filename
 
-                    with col_save1:
-                        if st.button("💾 Guardar en iCloud Desktop", use_container_width=True, type="primary"):
-                            try:
-                                ruta_completa = os.path.join(RUTA_ICLOUD_BACKUPS, filename)
-                                with open(ruta_completa, 'w', encoding='utf-8') as f:
-                                    f.write(json_export)
-                                st.success(f"✅ Guardado en: {ruta_completa}")
-                                st.info(f"📱 Accesible desde iPhone en: iCloud Drive/Desktop/DANIEL/GASTOS/Histórico backups/")
-                            except Exception as e:
-                                st.error(f"❌ Error al guardar: {e}")
+                # Contar transacciones del JSON
+                import json as json_module
+                data = json_module.loads(json_export)
+                num_transacciones = len(data.get('transacciones', []))
 
-                    with col_save2:
-                        st.download_button(
-                            label="⬇️ O Descargar (navegador)",
-                            data=json_export,
-                            file_name=filename,
-                            mime="application/json",
-                            use_container_width=True
-                        )
-                else:
-                    # Opción 2: Solo descarga normal (cuando está en Streamlit Cloud)
+                st.success(f"✅ Archivo generado: {num_transacciones} transacciones")
+                st.info("👇 Ahora puedes guardar o descargar el archivo usando los botones de abajo")
+
+        # Mostrar botones de guardado/descarga si hay un archivo generado
+        if st.session_state.json_exportacion:
+            st.markdown("---")
+
+            # Opción 1: Guardado directo en local (solo si está en Mac de Daniel)
+            if es_local:
+                col_save1, col_save2 = st.columns(2)
+
+                with col_save1:
+                    if st.button("💾 Guardar en iCloud Desktop", use_container_width=True, type="primary"):
+                        try:
+                            ruta_completa = os.path.join(RUTA_ICLOUD_BACKUPS, st.session_state.filename_exportacion)
+                            with open(ruta_completa, 'w', encoding='utf-8') as f:
+                                f.write(st.session_state.json_exportacion)
+                            st.success(f"✅ Guardado exitosamente en:")
+                            st.code(ruta_completa, language=None)
+                            st.info(f"📱 Accesible desde iPhone en:\niCloud Drive/Desktop/DANIEL/GASTOS/Histórico backups/{st.session_state.filename_exportacion}")
+                        except Exception as e:
+                            st.error(f"❌ Error al guardar: {e}")
+                            import traceback
+                            st.code(traceback.format_exc(), language=None)
+
+                with col_save2:
                     st.download_button(
-                        label="⬇️ Descargar Archivo JSON",
-                        data=json_export,
-                        file_name=filename,
-                        mime="application/json"
+                        label="⬇️ O Descargar (navegador)",
+                        data=st.session_state.json_exportacion,
+                        file_name=st.session_state.filename_exportacion,
+                        mime="application/json",
+                        use_container_width=True
                     )
+            else:
+                # Opción 2: Solo descarga normal (cuando está en Streamlit Cloud)
+                st.download_button(
+                    label="⬇️ Descargar Archivo JSON",
+                    data=st.session_state.json_exportacion,
+                    file_name=st.session_state.filename_exportacion,
+                    mime="application/json"
+                )
 
-                st.success(f"✅ Archivo generado: {len(transacciones)} transacciones")
+            # Botón para limpiar y generar uno nuevo
+            if st.button("🔄 Generar Nuevo Archivo", type="secondary"):
+                st.session_state.json_exportacion = None
+                st.session_state.filename_exportacion = None
+                st.rerun()
 
     with tab_import:
         st.subheader("Importar Base de Datos")
