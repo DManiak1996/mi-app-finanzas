@@ -357,7 +357,8 @@ div[data-testid="column"] > div:hover {{
 }}
 
 /* === 🔘 BOTONES PREMIUM CON GRADIENTES === */
-.stButton button {{
+.stButton button,
+.stFormSubmitButton button {{
     min-height: 48px !important;
     padding: {Spacing.MD} {Spacing.XL} !important;
     font-size: {Typography.TEXT_BASE} !important;
@@ -370,18 +371,24 @@ div[data-testid="column"] > div:hover {{
     overflow: hidden !important;
 }}
 
-.stButton button[kind="primary"] {{
+.stButton button[kind="primary"],
+.stFormSubmitButton button[kind="primary"],
+button[data-testid="stFormSubmitButton"][kind="primary"] {{
     background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
     color: white !important;
     box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
 }}
 
-.stButton button[kind="primary"]:hover {{
+.stButton button[kind="primary"]:hover,
+.stFormSubmitButton button[kind="primary"]:hover,
+button[data-testid="stFormSubmitButton"][kind="primary"]:hover {{
     transform: translateY(-2px) scale(1.05) !important;
     box-shadow: {Colors.SHADOW_PREMIUM_LG}, {Colors.SHADOW_GLOW_PRIMARY} !important;
 }}
 
-.stButton button[kind="primary"]:active {{
+.stButton button[kind="primary"]:active,
+.stFormSubmitButton button[kind="primary"]:active,
+button[data-testid="stFormSubmitButton"][kind="primary"]:active {{
     transform: translateY(0) scale(0.98) !important;
 }}
 
@@ -580,11 +587,28 @@ section[data-testid="stSidebar"] .stRadio label[data-checked="true"] {{
 }}
 
 /* Estilo minimal para navegación - ocultar círculos de radio buttons */
-section[data-testid="stSidebar"] .stRadio input[type="radio"] {{
+section[data-testid="stSidebar"] .stRadio input[type="radio"],
+section[data-testid="stSidebar"] input[type="radio"],
+section[data-testid="stSidebar"] .stRadio > div > div > div::before,
+section[data-testid="stSidebar"] .stRadio label > div::before,
+section[data-testid="stSidebar"] .stRadio label > div[role="radio"]::before,
+section[data-testid="stSidebar"] div[role="radio"]::before,
+section[data-testid="stSidebar"] div[role="radio"],
+section[data-testid="stSidebar"] .stRadio label span::before {{
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+}}
+
+/* Ocultar el círculo azul específicamente */
+section[data-testid="stSidebar"] .stRadio label > div,
+section[data-testid="stSidebar"] .stRadio label > div > div {{
     display: none !important;
 }}
 
-/* Indicador minimal en lugar de círculo */
+/* Indicador minimal en lugar de círculo - barra vertical verde lima */
 section[data-testid="stSidebar"] .stRadio label[data-checked="true"]::before {{
     content: '' !important;
     position: absolute !important;
@@ -595,6 +619,7 @@ section[data-testid="stSidebar"] .stRadio label[data-checked="true"]::before {{
     height: 70% !important;
     background: {Colors.PREMIUM_PRIMARY_END} !important;
     border-radius: 0 4px 4px 0 !important;
+    z-index: 999 !important;
 }}
 
 /* === ⚡ ANIMACIONES Y MICRO-INTERACCIONES === */
@@ -770,7 +795,8 @@ render_html("""
         if (Math.abs(swipeDistanceX) < swipeDistanceY) return;
 
         // Swipe desde el borde izquierdo hacia la derecha (abrir sidebar)
-        if (touchStartX < 50 && swipeDistanceX > 100) {
+        // Ampliado a 150px para evitar conflicto con navegación del navegador
+        if (touchStartX >= 50 && touchStartX < 150 && swipeDistanceX > 80) {
             const sidebarClass = sidebar.getAttribute('class');
             // Solo abrir si está colapsado
             if (sidebarClass && sidebarClass.includes('collapsed')) {
@@ -785,10 +811,11 @@ render_html("""
         }
 
         // Swipe desde dentro del sidebar hacia la izquierda (cerrar sidebar)
-        if (swipeDistanceX < -100) {
+        // Reducido umbral a -80px para ser más sensible
+        if (swipeDistanceX < -80) {
             const sidebarBounds = sidebar.getBoundingClientRect();
-            // Verificar que el swipe empezó dentro del sidebar
-            if (touchStartX < sidebarBounds.right) {
+            // Verificar que el swipe empezó dentro del sidebar y no demasiado cerca del borde derecho
+            if (touchStartX >= 0 && touchStartX < sidebarBounds.right - 10) {
                 const sidebarClass = sidebar.getAttribute('class');
                 // Solo cerrar si está expandido
                 if (sidebarClass && !sidebarClass.includes('collapsed')) {
@@ -813,10 +840,19 @@ st.sidebar.title("Navegación")
 # Navegación simple con radio button
 PAGINAS = ["Dashboard", "Añadir Gasto", "Transacciones", "Importar", "Categorías", "🔌 Coche Eléctrico", "Sincronización", "Configuración"]
 
+# Manejar redirección desde empty state u otros componentes
+index_inicial = 0
+if 'pagina_redirigir' in st.session_state:
+    try:
+        index_inicial = PAGINAS.index(st.session_state['pagina_redirigir'])
+    except ValueError:
+        index_inicial = 0
+    del st.session_state['pagina_redirigir']
+
 pagina_seleccionada = st.sidebar.radio(
     "Elige una página:",
     PAGINAS,
-    index=0
+    index=index_inicial
 )
 
 st.sidebar.markdown("---")
@@ -1179,7 +1215,24 @@ def mostrar_dashboard():
                         help="Diferencia entre el saldo máximo y mínimo alcanzado durante el mes"
                     )
                 else:
-                    st.info("No hay transacciones registradas en este mes")
+                    # Empty state mejorado
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: {Spacing.XXXL} {Spacing.XL}; background: {Colors.PREMIUM_CARD_GRADIENT}; border-radius: {BorderRadius.LG}; border: 2px dashed rgba(10, 76, 62, 0.2);">
+                        <div style="font-size: 64px; margin-bottom: {Spacing.LG};">📊</div>
+                        <h3 style="color: {Colors.GRAY_700}; margin-bottom: {Spacing.MD};">No hay transacciones aún</h3>
+                        <p style="color: {Colors.GRAY_500}; margin-bottom: {Spacing.XL};">
+                            Empieza a registrar tus gastos e ingresos para ver tus finanzas en acción.
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    col_cta1, col_cta2, col_cta3 = st.columns([1, 2, 1])
+                    with col_cta2:
+                        if st.button("➕ Añadir mi primera transacción", type="primary", use_container_width=True):
+                            st.session_state['pagina_redirigir'] = "Añadir Gasto"
+                            st.rerun()
 
         else:  # Vista anual
             with st.spinner("Calculando métricas anuales..."):
@@ -1736,10 +1789,21 @@ def mostrar_transacciones():
                 column_config=configuracion_columnas,
                 num_rows="fixed",
                 hide_index=True,
-                use_container_width=True
+                use_container_width=True,
+                key="data_editor_transacciones"
             )
 
-            if st.button("💾 Guardar Cambios"):
+            # Detectar cambios sin guardar y mostrar warning
+            hay_cambios = False
+            try:
+                # Comparar DataFrames para detectar cambios
+                if not df_editado.equals(df_a_mostrar):
+                    hay_cambios = True
+                    st.warning("⚠️ **Hay cambios sin guardar**. Haz clic en 'Guardar Cambios' para no perderlos.", icon="⚠️")
+            except:
+                pass
+
+            if st.button("💾 Guardar Cambios", type="primary" if hay_cambios else "secondary"):
                 # Reconstruir el dataframe completo con las columnas editadas
                 # Necesitamos mantener 'id' para poder actualizar la BD
                 if 'id' not in df_editado.columns:
