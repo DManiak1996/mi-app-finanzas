@@ -587,25 +587,20 @@ section[data-testid="stSidebar"] .stRadio label[data-checked="true"] {{
 }}
 
 /* Estilo minimal para navegación - ocultar círculos de radio buttons */
-section[data-testid="stSidebar"] .stRadio input[type="radio"],
-section[data-testid="stSidebar"] input[type="radio"],
-section[data-testid="stSidebar"] .stRadio > div > div > div::before,
-section[data-testid="stSidebar"] .stRadio label > div::before,
-section[data-testid="stSidebar"] .stRadio label > div[role="radio"]::before,
-section[data-testid="stSidebar"] div[role="radio"]::before,
-section[data-testid="stSidebar"] div[role="radio"],
-section[data-testid="stSidebar"] .stRadio label span::before {{
+/* Solo ocultar el input type radio, NO el texto */
+section[data-testid="stSidebar"] .stRadio input[type="radio"] {{
     display: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
 }}
 
-/* Ocultar el círculo azul específicamente */
-section[data-testid="stSidebar"] .stRadio label > div,
-section[data-testid="stSidebar"] .stRadio label > div > div {{
-    display: none !important;
+/* Ocultar solo el círculo, manteniendo el texto visible */
+section[data-testid="stSidebar"] div[role="radio"] {{
+    width: 0 !important;
+    height: 0 !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }}
 
 /* Indicador minimal en lugar de círculo - barra vertical verde lima */
