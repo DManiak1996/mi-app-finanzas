@@ -1,0 +1,37 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Ejecutar cada 12 horas (a las 6:00 AM y 6:00 PM UTC)
+    - cron: '0 6,18 * * *'
+
+  # Permitir ejecución manual desde GitHub UI
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          echo "🏓 Haciendo ping a la app de Streamlit..."
+          # Reemplaza esta URL con la URL de tu app en Streamlit Cloud
+          APP_URL="https://tu-app.streamlit.app"
+
+          # Hacer request HTTP GET
+          response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 $APP_URL)
+
+          if [ $response -eq 200 ] || [ $response -eq 302 ] || [ $response -eq 401 ]; then
+            echo "✅ App respondió con código: $response"
+            echo "✅ App está activa y funcionando"
+          else
+            echo "⚠️ App respondió con código: $response"
+            echo "⚠️ Puede que la app esté reiniciándose"
+          fi
+
+      - name: Log Execution
+        run: |
+          echo "📅 Ping ejecutado el: $(date)"
+          echo "🌍 Desde: GitHub Actions"
+          echo "⏰ Siguiente ejecución: en 12 horas"
