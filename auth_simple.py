@@ -176,7 +176,7 @@ def show_premium_login(authorized_email, correct_password):
                     animation: fadeInUp 0.5s ease;
                 ">
                     <div style="display: flex; align-items: center; gap: {Spacing.MD};">
-                        {brand_assets.get_icon('success')}
+                        <div id="success-icon-container"></div>
                         <div>
                             <h3 style="margin: 0; color: {Colors.PREMIUM_TEAL_START}; font-size: {Typography.TEXT_LG};">
                                 ✅ Acceso Concedido
@@ -188,6 +188,16 @@ def show_premium_login(authorized_email, correct_password):
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # Inyectar SVG de éxito via JavaScript (bypasea sanitizer)
+                render_html(f"""
+                <script>
+                const successIcon = window.parent.document.querySelector('#success-icon-container');
+                if (successIcon) {{
+                    successIcon.innerHTML = `{brand_assets.get_icon('success')}`;
+                }}
+                </script>
+                """, height=0)
 
                 st.session_state["authenticated"] = True
                 st.session_state["user_email"] = email_input
