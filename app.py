@@ -175,7 +175,11 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
                         'categoria': 'REEMBOLSO',
                         'notas': notas_reembolso
                     })
-                    st.success(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€")
+                    # Marcar flag para reabrir el modal después del rerun
+                    st.session_state.reabrir_modal_reembolsos = True
+                    st.session_state.mes_modal_reembolsos = mes
+                    st.session_state.año_modal_reembolsos = año
+                    st.toast(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€", icon="✅")
                     st.rerun()
     else:
         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
@@ -436,6 +440,13 @@ def mostrar_dashboard():
                     if st.button("💰 Gestionar reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="primary", use_container_width=True):
                         mostrar_modal_reembolsos(mes, año, ingreso_base)
 
+                    # Reabrir modal automáticamente si se procesó un reembolso
+                    if st.session_state.get('reabrir_modal_reembolsos', False):
+                        mes_modal = st.session_state.get('mes_modal_reembolsos', mes)
+                        año_modal = st.session_state.get('año_modal_reembolsos', año)
+                        st.session_state.reabrir_modal_reembolsos = False
+                        mostrar_modal_reembolsos(mes_modal, año_modal, ingreso_base)
+
                 col3, col4 = st.columns(2)
 
                 # Calcular balance basado en TOTAL INGRESOS usando gastos NETOS
@@ -496,8 +507,8 @@ def mostrar_dashboard():
                                 # Mostrar desglose si hay reembolsos asignados
                                 if reembolsos > 0:
                                     st.caption(f"💰 Bruto: {gastado_bruto:.2f} € | Reembolsos: {reembolsos:.2f} € | Neto: {gastado:.2f} €")
-                                # Barra de progreso visual
-                                st.progress(min(porcentaje / 100, 1.0))
+                                # Barra de progreso visual (asegurar rango [0.0, 1.0])
+                                st.progress(max(0.0, min(porcentaje / 100, 1.0)))
 
                             with col2:
                                 st.metric("Gastado", f"{gastado:.2f} €")
