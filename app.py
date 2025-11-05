@@ -701,7 +701,6 @@ html {{
 }}
 </style>
 """, unsafe_allow_html=True)
-""", unsafe_allow_html=True)
 
 # --- Barra lateral de navegación ---
 st.sidebar.title("Navegación")
