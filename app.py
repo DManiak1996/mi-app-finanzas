@@ -1611,7 +1611,27 @@ def mostrar_transacciones():
             df_filtrado['fecha'] = pd.to_datetime(df_filtrado['fecha'])
 
             st.info("Puedes editar las celdas directamente. Haz clic en 'Guardar Cambios' para persistir las modificaciones.")
-            
+
+            # Selector de columnas a mostrar
+            with st.expander("🔧 Configurar columnas visibles"):
+                todas_columnas = list(df_filtrado.columns)
+                # Columnas ocultas por defecto
+                columnas_ocultas_default = ['id', 'mes', 'año', 'created_at', 'updated_at']
+                columnas_visibles_default = [col for col in todas_columnas if col not in columnas_ocultas_default]
+
+                columnas_seleccionadas = st.multiselect(
+                    "Selecciona las columnas a mostrar:",
+                    options=todas_columnas,
+                    default=columnas_visibles_default,
+                    help="Elige qué columnas quieres ver en la tabla"
+                )
+
+            # Filtrar dataframe según columnas seleccionadas
+            if columnas_seleccionadas:
+                df_a_mostrar = df_filtrado[columnas_seleccionadas].copy()
+            else:
+                df_a_mostrar = df_filtrado.copy()
+
             # Configuración del editor de datos
             configuracion_columnas = {
                 "id": st.column_config.NumberColumn("ID", disabled=True),
@@ -1620,9 +1640,9 @@ def mostrar_transacciones():
                 "importe": st.column_config.NumberColumn("Importe", format="%.2f €"),
                 "categoria": st.column_config.SelectboxColumn("Categoría", options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "REEMBOLSO", "INGRESO", "SIN_CLASIFICAR"], width="medium")
             }
-            
+
             df_editado = st.data_editor(
-                df_filtrado,
+                df_a_mostrar,
                 column_config=configuracion_columnas,
                 num_rows="fixed",
                 hide_index=True,
@@ -1630,39 +1650,51 @@ def mostrar_transacciones():
             )
 
             if st.button("💾 Guardar Cambios"):
-                # Asegurarse de que los dataframes originales y editados tengan los mismos tipos y orden de columnas para una comparación justa
-                df_original_comp = df_original.set_index('id').sort_index()
-                df_editado_comp = df_editado.set_index('id').sort_index()
-                
-                # Convertir la fecha del df_original a datetime para comparar con el editor
-                df_original_comp['fecha'] = pd.to_datetime(df_original_comp['fecha'])
-                
-                # Encontrar las filas que han cambiado
-                try:
-                    # `compare` devuelve un DataFrame con las diferencias
-                    diferencias = df_original_comp.compare(df_editado_comp)
-                except ValueError: # Ocurre si no hay cambios
-                    diferencias = pd.DataFrame()
-                
-                if not diferencias.empty:
-                    with st.spinner("Guardando cambios en la base de datos..."):
-                        updates_exitosos = 0
-                        # Iterar sobre los índices de las filas modificadas
-                        for id_transaccion in diferencias.index.unique():
-                            # Obtener la fila completa de datos editados
-                            fila_editada = df_editado_comp.loc[id_transaccion]
-                            campos_a_actualizar = fila_editada.to_dict()
-                            # **LA SOLUCIÓN CLAVE**: Convertir Timestamp a objeto date
-                            if 'fecha' in campos_a_actualizar and isinstance(campos_a_actualizar['fecha'], pd.Timestamp):
-                                campos_a_actualizar['fecha'] = campos_a_actualizar['fecha'].date()
-                                
-                            if campos_a_actualizar:
-                                if db_manager.actualizar_transaccion(id_transaccion, campos_a_actualizar):
-                                    updates_exitosos += 1
-                    st.success(f"{updates_exitosos} transacciones actualizadas correctamente.")
-                    st.rerun()
+                # Reconstruir el dataframe completo con las columnas editadas
+                # Necesitamos mantener 'id' para poder actualizar la BD
+                if 'id' not in df_editado.columns:
+                    st.error("❌ Error: La columna 'id' es necesaria para guardar cambios. Por favor, inclúyela en las columnas visibles.")
                 else:
-                    st.info("No se detectaron cambios para guardar.")
+                    # Crear una copia del df_filtrado original con las ediciones aplicadas
+                    df_con_ediciones = df_filtrado.copy()
+                    for col in df_editado.columns:
+                        if col in df_con_ediciones.columns:
+                            df_con_ediciones[col] = df_editado[col]
+
+                    # Asegurarse de que los dataframes originales y editados tengan los mismos tipos y orden de columnas para una comparación justa
+                    df_original_comp = df_original.set_index('id').sort_index()
+                    df_editado_comp = df_con_ediciones.set_index('id').sort_index()
+
+                    # Convertir la fecha del df_original a datetime para comparar con el editor
+                    df_original_comp['fecha'] = pd.to_datetime(df_original_comp['fecha'])
+
+                    # Encontrar las filas que han cambiado
+                    try:
+                        # Solo comparar las columnas que están en ambos dataframes
+                        columnas_comunes = list(set(df_original_comp.columns) & set(df_editado_comp.columns))
+                        diferencias = df_original_comp[columnas_comunes].compare(df_editado_comp[columnas_comunes])
+                    except ValueError: # Ocurre si no hay cambios
+                        diferencias = pd.DataFrame()
+
+                    if not diferencias.empty:
+                        with st.spinner("Guardando cambios en la base de datos..."):
+                            updates_exitosos = 0
+                            # Iterar sobre los índices de las filas modificadas
+                            for id_transaccion in diferencias.index.unique():
+                                # Obtener la fila completa de datos editados
+                                fila_editada = df_editado_comp.loc[id_transaccion]
+                                campos_a_actualizar = fila_editada.to_dict()
+                                # **LA SOLUCIÓN CLAVE**: Convertir Timestamp a objeto date
+                                if 'fecha' in campos_a_actualizar and isinstance(campos_a_actualizar['fecha'], pd.Timestamp):
+                                    campos_a_actualizar['fecha'] = campos_a_actualizar['fecha'].date()
+
+                                if campos_a_actualizar:
+                                    if db_manager.actualizar_transaccion(id_transaccion, campos_a_actualizar):
+                                        updates_exitosos += 1
+                        st.success(f"{updates_exitosos} transacciones actualizadas correctamente.")
+                        st.rerun()
+                    else:
+                        st.info("No se detectaron cambios para guardar.")
         else:
             st.info("No se encontraron transacciones para el período seleccionado.")
 
