@@ -134,28 +134,32 @@ def calcular_liquido_disponible():
 def calcular_tasa_ahorro(mes, año):
     """
     Calcula el porcentaje de ingresos que se está ahorrando.
-    Usa el ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual.
+    Usa el total de ingresos del mes (nómina + extraordinarios).
 
     Returns:
-        Dict con tasa_ahorro (%), ingreso_base, gastos, ahorro_absoluto
+        Dict con tasa_ahorro (%), total_ingresos, gastos_netos, ahorro_absoluto
     """
     datos = calcular_totales_mes(mes, año)
 
-    # Usar ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual
+    # Calcular total de ingresos del mes (nómina + extraordinarios)
     ingreso_base = obtener_ingreso_base_mes(mes, año)
-    gastos = abs(datos['gastos_netos'])  # Usar gastos netos (después de reembolsos)
-    ahorro = ingreso_base - gastos
+    ingresos_extra = obtener_ingresos_extraordinarios_mes(mes, año)
+    total_ingresos = ingreso_base + ingresos_extra['total']
 
-    if ingreso_base == 0:
+    gastos_netos = abs(datos['gastos_netos'])  # Usar gastos netos (después de reembolsos)
+    ahorro = total_ingresos - gastos_netos
+
+    if total_ingresos == 0:
         tasa = 0
     else:
-        tasa = (ahorro / ingreso_base) * 100
+        tasa = (ahorro / total_ingresos) * 100
 
     return {
         'tasa_ahorro': round(tasa, 2),
         'ahorro_absoluto': round(ahorro, 2),
+        'total_ingresos': round(total_ingresos, 2),
         'ingreso_base': round(ingreso_base, 2),
-        'gastos': round(gastos, 2)
+        'gastos': round(gastos_netos, 2)
     }
 
 
@@ -327,29 +331,31 @@ def calcular_proyeccion_balance(meses_futuro=3):
 def calcular_efficiency_ratios(mes, año):
     """
     Calcula ratios de eficiencia financiera.
-    Usa el ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual.
+    Usa el total de ingresos del mes (nómina + extraordinarios).
 
     Returns:
-        Dict con ratios de cada categoría sobre ingresos
+        Dict con ratios de cada categoría sobre total de ingresos
     """
     datos = calcular_totales_mes(mes, año)
 
-    # Usar ingreso base (nómina del mes anterior) en lugar de ingresos del mes actual
+    # Calcular total de ingresos del mes
     ingreso_base = obtener_ingreso_base_mes(mes, año)
+    ingresos_extra = obtener_ingresos_extraordinarios_mes(mes, año)
+    total_ingresos = ingreso_base + ingresos_extra['total']
 
-    if ingreso_base == 0:
+    if total_ingresos == 0:
         return {
             'ratio_fijos': 0,
             'ratio_disfrute': 0,
             'ratio_extraordinarios': 0,
-            'evaluacion': 'Sin ingreso base registrado',
-            'ingreso_base': 0
+            'evaluacion': 'Sin ingresos registrados',
+            'total_ingresos': 0
         }
 
     # Ratios por categoría
     ratios = {}
     for cat, gasto in datos['gastos_por_categoria'].items():
-        ratio = (abs(gasto) / ingreso_base) * 100
+        ratio = (abs(gasto) / total_ingresos) * 100
         ratios[f'ratio_{cat.lower()}'] = round(ratio, 2)
 
     # Evaluación
@@ -366,7 +372,7 @@ def calcular_efficiency_ratios(mes, año):
         evaluacion = '❌ Gastos excesivos, acción necesaria'
 
     ratios['evaluacion'] = evaluacion
-    ratios['ingreso_base'] = round(ingreso_base, 2)
+    ratios['total_ingresos'] = round(total_ingresos, 2)
 
     return ratios
 

@@ -264,16 +264,28 @@ def mostrar_dashboard():
             with st.spinner("Calculando métricas mensuales..."):
                 datos_mes = metrics.calcular_totales_mes(mes, año)
 
+                # Calcular ingresos totales del mes
+                ingreso_base = metrics.obtener_ingreso_base_mes(mes, año)
+                ingresos_extra = metrics.obtener_ingresos_extraordinarios_mes(mes, año)
+                total_ingresos_mes = ingreso_base + ingresos_extra['total']
+
                 # Métricas principales en cards - Layout responsive (2x2)
                 col1, col2 = st.columns(2)
 
-                # Usar ingreso base (nómina del mes anterior) en lugar del ingreso del mes actual
-                ingreso_base = metrics.obtener_ingreso_base_mes(mes, año)
-                col1.metric(
-                    "💰 Ingreso Base",
-                    f"{ingreso_base:.2f} €",
-                    help="Ingreso principal (nómina) del mes anterior. Se usa como referencia para calcular gastos"
-                )
+                # MÉTRICA PRINCIPAL: Total Ingresos del Mes con botón de desglose
+                with col1:
+                    col1_1, col1_2 = st.columns([4, 1])
+                    with col1_1:
+                        st.metric(
+                            "💵 Total Ingresos Mes",
+                            f"{total_ingresos_mes:.2f} €",
+                            help="Suma de todos los ingresos del mes (nómina + extraordinarios)"
+                        )
+                    with col1_2:
+                        # Botón para ver desglose de ingresos
+                        st.markdown("<br>", unsafe_allow_html=True)  # Espaciado para alinear
+                        if st.button("ℹ️", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="secondary"):
+                            st.session_state.mostrar_desglose_ingresos = True
 
                 with col2:
                     col2_1, col2_2 = st.columns([4, 1])
@@ -298,31 +310,100 @@ def mostrar_dashboard():
 
                 col3, col4 = st.columns(2)
 
-                # Calcular balance basado en ingreso base usando gastos NETOS
-                balance_vs_base = ingreso_base + datos_mes['gastos_netos']  # gastos_netos ya es negativo
+                # Calcular balance basado en TOTAL INGRESOS usando gastos NETOS
+                balance_mes = total_ingresos_mes + datos_mes['gastos_netos']  # gastos_netos ya es negativo
                 col3.metric(
-                    "⚖️ Balance vs Ingreso Base",
-                    f"{balance_vs_base:.2f} €",
-                    delta=f"{balance_vs_base:.2f} €",
-                    delta_color="normal" if balance_vs_base > 0 else "inverse",
-                    help="Diferencia entre tu ingreso base (nómina) y los gastos del mes. Positivo = superávit, Negativo = déficit"
+                    "⚖️ Balance del Mes",
+                    f"{balance_mes:.2f} €",
+                    delta=f"{balance_mes:.2f} €",
+                    delta_color="normal" if balance_mes > 0 else "inverse",
+                    help="Diferencia entre total de ingresos y gastos netos del mes. Positivo = superávit, Negativo = déficit"
                 )
 
-                # Tasa de ahorro basada en ingreso base
-                if ingreso_base > 0:
-                    tasa_ahorro_pct = (balance_vs_base / ingreso_base) * 100
+                # Tasa de ahorro basada en TOTAL INGRESOS
+                if total_ingresos_mes > 0:
+                    tasa_ahorro_pct = (balance_mes / total_ingresos_mes) * 100
                 else:
                     tasa_ahorro_pct = 0
 
                 col4.metric(
                     "💾 Tasa Ahorro",
                     f"{tasa_ahorro_pct:.1f}%",
-                    delta=f"{balance_vs_base:.0f} €",
-                    help="Porcentaje de tu ingreso base que has logrado ahorrar. Ideal: >20%. Mide tu capacidad de ahorro"
+                    delta=f"{balance_mes:.0f} €",
+                    help="Porcentaje de tus ingresos totales que has logrado ahorrar. Ideal: >20%. Mide tu capacidad de ahorro real"
                 )
 
                 st.markdown("---")
 
+                # Modal de Desglose de Ingresos (aparece al hacer clic en ℹ️)
+                if st.session_state.get('mostrar_desglose_ingresos', False):
+                    st.subheader("💵 Desglose de Ingresos del Mes")
+                    st.info("Aquí puedes ver el detalle de todos los ingresos del mes actual.")
+
+                    col1, col2, col3 = st.columns(3)
+
+                    col1.metric(
+                        "💼 Ingreso Base (Nómina)",
+                        f"{ingreso_base:.2f} €",
+                        help="Nómina regular (del mes anterior o actual según disponibilidad)"
+                    )
+
+                    col2.metric(
+                        "✨ Ingresos Extraordinarios",
+                        f"{ingresos_extra['total']:.2f} €",
+                        delta=f"{ingresos_extra['cantidad']} transacciones",
+                        help="Pagas extras, devoluciones IRPF, ventas, bonificaciones, etc."
+                    )
+
+                    col3.metric(
+                        "💵 Total Ingresos",
+                        f"{total_ingresos_mes:.2f} €",
+                        help="Ingreso base + extraordinarios"
+                    )
+
+                    # Mostrar desglose detallado si hay ingresos extraordinarios
+                    if ingresos_extra['total'] > 0:
+                        st.markdown("---")
+                        st.markdown("**📋 Detalle de Ingresos Extraordinarios:**")
+
+                        desglose = ingresos_extra['desglose']
+
+                        if desglose['pagas_extras'] > 0:
+                            st.caption(f"💼 Pagas extras / Nóminas adicionales: **{desglose['pagas_extras']:.2f} €**")
+
+                        if desglose['irpf_bonificaciones'] > 0:
+                            st.caption(f"🏦 Devoluciones IRPF / Bonificaciones: **{desglose['irpf_bonificaciones']:.2f} €**")
+
+                        if desglose['otros'] > 0:
+                            st.caption(f"🔄 Otros ingresos: **{desglose['otros']:.2f} €**")
+
+                        if desglose['sin_clasificar'] > 0:
+                            st.caption(f"❓ Sin clasificar: **{desglose['sin_clasificar']:.2f} €**")
+
+                        # Mostrar lista de transacciones
+                        st.markdown("---")
+                        st.markdown("**📝 Lista de Transacciones:**")
+                        for t in ingresos_extra['transacciones']:
+                            categoria_icon = {
+                                'FIJOS': '💼',
+                                'EXTRAORDINARIOS': '🏦',
+                                'INGRESO': '💰',
+                                'SIN_CLASIFICAR': '❓'
+                            }.get(t.get('categoria'), '📌')
+
+                            concepto_corto = t['concepto'][:50] + "..." if len(t['concepto']) > 50 else t['concepto']
+                            st.caption(f"{categoria_icon} {t['fecha']} - {concepto_corto}: **{t['importe']:.2f} €**")
+                    else:
+                        st.info("ℹ️ No hay ingresos extraordinarios en este mes (solo nómina regular)")
+
+                    # Botón para cerrar el modal
+                    col_cerrar1, col_cerrar2, col_cerrar3 = st.columns([1, 1, 1])
+                    with col_cerrar2:
+                        if st.button("🔙 Cerrar", key="cerrar_desglose_ingresos", use_container_width=True):
+                            st.session_state.mostrar_desglose_ingresos = False
+                            st.rerun()
+
+                st.markdown("---")
                 # Modal de gestión de reembolsos
                 if st.session_state.get('mostrar_modal_reembolsos', False):
                     st.subheader("💰 Gestionar Reembolsos")
@@ -338,9 +419,10 @@ def mostrar_dashboard():
 
                     if ingresos_sin_clasificar:
                         st.write(f"**{len(ingresos_sin_clasificar)} ingresos pendientes de revisar:**")
+                        st.info("💡 **Tip**: Asigna la categoría de gasto que este reembolso compensa (ej: si te devolvieron dinero de un restaurante, selecciona DISFRUTE)")
 
                         for ingreso in ingresos_sin_clasificar:
-                            col1, col2, col3, col4 = st.columns([2, 1, 2, 1])
+                            col1, col2, col3, col4, col5 = st.columns([1.5, 0.8, 2, 1.5, 0.8])
 
                             with col1:
                                 st.text(ingreso['fecha'])
@@ -348,13 +430,26 @@ def mostrar_dashboard():
                                 st.text(f"{ingreso['importe']:.2f} €")
                             with col3:
                                 # Mostrar concepto truncado
-                                concepto = ingreso['concepto'][:40] + "..." if len(ingreso['concepto']) > 40 else ingreso['concepto']
+                                concepto = ingreso['concepto'][:30] + "..." if len(ingreso['concepto']) > 30 else ingreso['concepto']
                                 st.text(concepto)
                             with col4:
-                                if st.button("✅ Marcar", key=f"marcar_reembolso_{ingreso['id']}", help="Marcar como REEMBOLSO"):
-                                    # Actualizar categoría a REEMBOLSO
-                                    db_manager.actualizar_transaccion(ingreso['id'], {'categoria': 'REEMBOLSO'})
-                                    st.success(f"Marcado como reembolso: {ingreso['importe']:.2f}€")
+                                # Dropdown de categorías de GASTO (para asignar el reembolso)
+                                categoria_gasto = st.selectbox(
+                                    "Categoría",
+                                    options=["FIJOS", "DISFRUTE", "EXTRAORDINARIOS", "SIN_ASIGNAR"],
+                                    key=f"cat_reembolso_{ingreso['id']}",
+                                    label_visibility="collapsed"
+                                )
+                            with col5:
+                                if st.button("✅", key=f"marcar_reembolso_{ingreso['id']}", help="Marcar como REEMBOLSO"):
+                                    # Actualizar categoría a REEMBOLSO y guardar categoría de gasto asociada en notas
+                                    notas_reembolso = f"REEMBOLSO_DE:{categoria_gasto}" if categoria_gasto != "SIN_ASIGNAR" else "REEMBOLSO_DE:SIN_ASIGNAR"
+
+                                    db_manager.actualizar_transaccion(ingreso['id'], {
+                                        'categoria': 'REEMBOLSO',
+                                        'notas': notas_reembolso
+                                    })
+                                    st.success(f"✅ Reembolso de {categoria_gasto}: {ingreso['importe']:.2f}€")
                                     st.rerun()
                     else:
                         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
@@ -378,6 +473,8 @@ def mostrar_dashboard():
                         gastado = presupuesto['gastado']
                         restante = presupuesto['restante']
                         porcentaje = presupuesto['porcentaje_usado']
+                        gastado_bruto = presupuesto.get('gastado_bruto', gastado)
+                        reembolsos = presupuesto.get('reembolsos_asignados', 0)
 
                         # Determinar color según porcentaje usado
                         if porcentaje < 70:
@@ -395,6 +492,9 @@ def mostrar_dashboard():
 
                             with col1:
                                 st.markdown(f"**{color} {categoria}**")
+                                # Mostrar desglose si hay reembolsos asignados
+                                if reembolsos > 0:
+                                    st.caption(f"💰 Bruto: {gastado_bruto:.2f} € | Reembolsos: {reembolsos:.2f} € | Neto: {gastado:.2f} €")
                                 # Barra de progreso visual
                                 st.progress(min(porcentaje / 100, 1.0))
 
@@ -1347,20 +1447,51 @@ def mostrar_sincronizacion():
 
         st.markdown("---")
 
+        # Detectar si estamos en local (Mac de Daniel) para ofrecer guardado directo
+        import os
+        RUTA_ICLOUD_BACKUPS = '/Users/daniel/Desktop/DANIEL/GASTOS/Histórico backups'
+        es_local = os.path.exists(RUTA_ICLOUD_BACKUPS)
+
+        if es_local:
+            st.info("🏠 **Modo Local Detectado** - Puedes guardar directamente en tu carpeta de iCloud")
+
         if st.button("📥 Generar Archivo de Exportación", type="primary"):
             with st.spinner("Generando archivo..."):
                 json_export = sync.generar_json_exportacion()
-
-                # Ofrecer descarga
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"finanzas_export_{timestamp}.json"
 
-                st.download_button(
-                    label="⬇️ Descargar Archivo JSON",
-                    data=json_export,
-                    file_name=filename,
-                    mime="application/json"
-                )
+                # Opción 1: Guardado directo en local (solo si está en Mac de Daniel)
+                if es_local:
+                    col_save1, col_save2 = st.columns(2)
+
+                    with col_save1:
+                        if st.button("💾 Guardar en iCloud Desktop", use_container_width=True, type="primary"):
+                            try:
+                                ruta_completa = os.path.join(RUTA_ICLOUD_BACKUPS, filename)
+                                with open(ruta_completa, 'w', encoding='utf-8') as f:
+                                    f.write(json_export)
+                                st.success(f"✅ Guardado en: {ruta_completa}")
+                                st.info(f"📱 Accesible desde iPhone en: iCloud Drive/Desktop/DANIEL/GASTOS/Histórico backups/")
+                            except Exception as e:
+                                st.error(f"❌ Error al guardar: {e}")
+
+                    with col_save2:
+                        st.download_button(
+                            label="⬇️ O Descargar (navegador)",
+                            data=json_export,
+                            file_name=filename,
+                            mime="application/json",
+                            use_container_width=True
+                        )
+                else:
+                    # Opción 2: Solo descarga normal (cuando está en Streamlit Cloud)
+                    st.download_button(
+                        label="⬇️ Descargar Archivo JSON",
+                        data=json_export,
+                        file_name=filename,
+                        mime="application/json"
+                    )
 
                 st.success(f"✅ Archivo generado: {len(transacciones)} transacciones")
 

@@ -852,6 +852,9 @@ def obtener_resumen_presupuestos(mes, año):
     """
     Obtiene el resumen de presupuestos vs gastos reales para un mes específico.
 
+    Calcula los gastos NETOS por categoría, restando los reembolsos que han sido
+    asignados específicamente a cada categoría (mediante notas 'REEMBOLSO_DE:{categoria}').
+
     Args:
         mes: Mes (1-12)
         año: Año
@@ -863,26 +866,48 @@ def obtener_resumen_presupuestos(mes, año):
     cursor = conn.cursor()
 
     cursor.execute("""
+        WITH gastos_brutos AS (
+            SELECT
+                p.categoria,
+                p.limite_mensual,
+                COALESCE(SUM(ABS(t.importe)), 0) as gastado_bruto
+            FROM presupuestos_mensuales p
+            LEFT JOIN transacciones t ON
+                t.categoria = p.categoria
+                AND t.tipo = 'GASTO'
+                AND t.mes = ?
+                AND t.año = ?
+            WHERE p.activo = 1
+            GROUP BY p.categoria, p.limite_mensual
+        ),
+        reembolsos_categoria AS (
+            SELECT
+                REPLACE(notas, 'REEMBOLSO_DE:', '') as categoria,
+                SUM(importe) as total_reembolsos
+            FROM transacciones
+            WHERE categoria = 'REEMBOLSO'
+                AND tipo = 'INGRESO'
+                AND mes = ?
+                AND año = ?
+                AND notas LIKE 'REEMBOLSO_DE:%'
+            GROUP BY notas
+        )
         SELECT
-            p.categoria,
-            p.limite_mensual as presupuesto,
-            COALESCE(SUM(ABS(t.importe)), 0) as gastado,
-            p.limite_mensual - COALESCE(SUM(ABS(t.importe)), 0) as restante,
+            g.categoria,
+            g.limite_mensual as presupuesto,
+            g.gastado_bruto,
+            COALESCE(r.total_reembolsos, 0) as reembolsos_asignados,
+            g.gastado_bruto - COALESCE(r.total_reembolsos, 0) as gastado,
+            g.limite_mensual - (g.gastado_bruto - COALESCE(r.total_reembolsos, 0)) as restante,
             CASE
-                WHEN p.limite_mensual > 0 THEN
-                    (COALESCE(SUM(ABS(t.importe)), 0) / p.limite_mensual) * 100
+                WHEN g.limite_mensual > 0 THEN
+                    ((g.gastado_bruto - COALESCE(r.total_reembolsos, 0)) / g.limite_mensual) * 100
                 ELSE 0
             END as porcentaje_usado
-        FROM presupuestos_mensuales p
-        LEFT JOIN transacciones t ON
-            t.categoria = p.categoria
-            AND t.tipo = 'GASTO'
-            AND t.mes = ?
-            AND t.año = ?
-        WHERE p.activo = 1
-        GROUP BY p.categoria, p.limite_mensual
+        FROM gastos_brutos g
+        LEFT JOIN reembolsos_categoria r ON g.categoria = r.categoria
         ORDER BY porcentaje_usado DESC
-    """, (mes, año))
+    """, (mes, año, mes, año))
 
     resumen = [dict(row) for row in cursor.fetchall()]
     conn.close()
