@@ -158,9 +158,9 @@ def calcular_tasa_ahorro(mes, año):
     datos = calcular_totales_mes(mes, año)
 
     # Calcular total de ingresos del mes (nómina + extraordinarios)
-    ingreso_base = obtener_ingreso_base_mes(mes, año)
+    ingreso_base_data = obtener_ingreso_base_mes(mes, año)
     ingresos_extra = obtener_ingresos_extraordinarios_mes(mes, año)
-    total_ingresos = ingreso_base + ingresos_extra['total']
+    total_ingresos = ingreso_base_data['importe'] + ingresos_extra['total']
 
     gastos_netos = abs(datos['gastos_netos'])  # Usar gastos netos (después de reembolsos)
     ahorro = total_ingresos - gastos_netos
@@ -174,7 +174,7 @@ def calcular_tasa_ahorro(mes, año):
         'tasa_ahorro': round(tasa, 2),
         'ahorro_absoluto': round(ahorro, 2),
         'total_ingresos': round(total_ingresos, 2),
-        'ingreso_base': round(ingreso_base, 2),
+        'ingreso_base': round(ingreso_base_data['importe'], 2),
         'gastos': round(gastos_netos, 2)
     }
 
@@ -355,9 +355,9 @@ def calcular_efficiency_ratios(mes, año):
     datos = calcular_totales_mes(mes, año)
 
     # Calcular total de ingresos del mes
-    ingreso_base = obtener_ingreso_base_mes(mes, año)
+    ingreso_base_data = obtener_ingreso_base_mes(mes, año)
     ingresos_extra = obtener_ingresos_extraordinarios_mes(mes, año)
-    total_ingresos = ingreso_base + ingresos_extra['total']
+    total_ingresos = ingreso_base_data['importe'] + ingresos_extra['total']
 
     if total_ingresos == 0:
         return {
@@ -500,7 +500,7 @@ def obtener_ingreso_base_mes(mes, año):
     5. Busca cualquier ingreso alto (>500€) bien clasificado
 
     Returns:
-        float: Importe de la nómina regular del mes
+        dict: {'importe': float, 'fecha': str} con datos de la nómina regular del mes
     """
     from database import db_manager
     import calendar
@@ -533,7 +533,7 @@ def obtener_ingreso_base_mes(mes, año):
     resultado = cursor.fetchone()
     if resultado and resultado['importe']:
         conn.close()
-        return resultado['importe']
+        return {'importe': resultado['importe'], 'fecha': resultado['fecha']}
 
     # ESTRATEGIA 2: Buscar nómina en últimos 7 días del mes ANTERIOR
     # Fallback para casos donde la nómina se adelanta (ej: pagada 28-31 del mes anterior)
@@ -554,7 +554,7 @@ def obtener_ingreso_base_mes(mes, año):
     resultado = cursor.fetchone()
     if resultado and resultado['importe']:
         conn.close()
-        return resultado['importe']
+        return {'importe': resultado['importe'], 'fecha': resultado['fecha']}
 
     # ESTRATEGIA 3: Buscar nómina en primeros 10 días del mes ACTUAL
     # Para nóminas tardías (ej: febrero pagada el 5 de marzo)
@@ -573,7 +573,7 @@ def obtener_ingreso_base_mes(mes, año):
     resultado = cursor.fetchone()
     if resultado and resultado['importe']:
         conn.close()
-        return resultado['importe']
+        return {'importe': resultado['importe'], 'fecha': resultado['fecha']}
 
     # ESTRATEGIA 4: Si hay múltiples FIJOS en el mes (pagas extras),
     # tomar el más frecuente o el primero cronológicamente
@@ -592,12 +592,12 @@ def obtener_ingreso_base_mes(mes, año):
     resultado = cursor.fetchone()
     if resultado and resultado['importe']:
         conn.close()
-        return resultado['importe']
+        return {'importe': resultado['importe'], 'fecha': resultado['primera_fecha']}
 
     # ESTRATEGIA 5: Buscar cualquier ingreso alto (>500€) que no sea EXTRAORDINARIOS
     # Para casos donde la nómina no está bien clasificada
     cursor.execute("""
-        SELECT MAX(importe) as max_ingreso
+        SELECT importe, fecha
         FROM transacciones
         WHERE tipo = 'INGRESO'
         AND categoria != 'EXTRAORDINARIOS'
@@ -605,16 +605,18 @@ def obtener_ingreso_base_mes(mes, año):
         AND importe > 500
         AND mes = ?
         AND año = ?
+        ORDER BY importe DESC
+        LIMIT 1
     """, (mes, año))
 
     resultado = cursor.fetchone()
-    if resultado and resultado['max_ingreso']:
+    if resultado and resultado['importe']:
         conn.close()
-        return resultado['max_ingreso']
+        return {'importe': resultado['importe'], 'fecha': resultado['fecha']}
 
-    # FALLBACK: Devolver 0 si no se encuentra nada
+    # FALLBACK: Devolver None si no se encuentra nada
     conn.close()
-    return 0.0
+    return {'importe': 0.0, 'fecha': None}
 
 def obtener_ingresos_extraordinarios_mes(mes, año):
     """
@@ -633,7 +635,7 @@ def obtener_ingresos_extraordinarios_mes(mes, año):
     transacciones = db_manager.obtener_transacciones(mes=mes, año=año)
 
     # Obtener la nómina regular para excluirla
-    ingreso_base = obtener_ingreso_base_mes(mes, año)
+    ingreso_base_data = obtener_ingreso_base_mes(mes, año)
 
     ingresos_extraordinarios = []
 
@@ -643,7 +645,7 @@ def obtener_ingresos_extraordinarios_mes(mes, año):
             continue
 
         # Excluir la nómina regular (con tolerancia de 1€ por si hay variaciones)
-        if ingreso_base > 0 and abs(t['importe'] - ingreso_base) < 1.0:
+        if ingreso_base_data['importe'] > 0 and abs(t['importe'] - ingreso_base_data['importe']) < 1.0:
             continue
 
         ingresos_extraordinarios.append(t)

@@ -70,17 +70,31 @@ inicializar_app()
 # --- Funciones de Dialog (Popups) ---
 
 @st.dialog("💵 Desglose de Ingresos del Mes", width="large")
-def mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes):
+def mostrar_desglose_ingresos(ingreso_base_data, ingresos_extra, total_ingresos_mes):
     """Dialog popup para mostrar el desglose detallado de ingresos"""
     st.info("Aquí puedes ver el detalle de todos los ingresos del mes actual.")
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric(
-        "💼 Ingreso Base (Nómina)",
-        f"{ingreso_base:.2f} €",
-        help="Nómina regular (del mes anterior o actual según disponibilidad)"
-    )
+    # Mostrar nómina con fecha si existe
+    if ingreso_base_data['fecha']:
+        from datetime import datetime
+        fecha_obj = datetime.strptime(ingreso_base_data['fecha'], '%Y-%m-%d')
+        fecha_str = fecha_obj.strftime('%d/%m/%Y')
+        col1.metric(
+            "💼 Ingreso Base (Nómina)",
+            f"{ingreso_base_data['importe']:.2f} €",
+            delta=f"Recibida el {fecha_str}",
+            help="Nómina regular identificada para este mes"
+        )
+    else:
+        col1.metric(
+            "💼 Ingreso Base (Nómina)",
+            f"{ingreso_base_data['importe']:.2f} €",
+            delta="Sin nómina registrada",
+            delta_color="off",
+            help="No se encontró nómina para este mes"
+        )
 
     col2.metric(
         "✨ Ingresos Extraordinarios",
@@ -420,9 +434,9 @@ def mostrar_dashboard():
                 datos_mes = metrics.calcular_totales_mes(mes, año)
 
                 # Calcular ingresos totales del mes
-                ingreso_base = metrics.obtener_ingreso_base_mes(mes, año)
+                ingreso_base_data = metrics.obtener_ingreso_base_mes(mes, año)
                 ingresos_extra = metrics.obtener_ingresos_extraordinarios_mes(mes, año)
-                total_ingresos_mes = ingreso_base + ingresos_extra['total']
+                total_ingresos_mes = ingreso_base_data['importe'] + ingresos_extra['total']
 
                 # Métricas principales en cards - Layout responsive (2x2)
                 col1, col2 = st.columns(2)
@@ -436,7 +450,7 @@ def mostrar_dashboard():
                     )
                     # Botón para ver desglose de ingresos (popup) - pegado debajo de la métrica
                     if st.button("ℹ️ Ver desglose", key="btn_desglose_ingresos", help="Ver desglose de ingresos", type="primary"):
-                        mostrar_desglose_ingresos(ingreso_base, ingresos_extra, total_ingresos_mes)
+                        mostrar_desglose_ingresos(ingreso_base_data, ingresos_extra, total_ingresos_mes)
 
                 with col2:
                     # Mostrar gastos netos (después de reembolsos)
@@ -458,7 +472,7 @@ def mostrar_dashboard():
                     )
                     # Botón para gestionar reembolsos (popup) - pegado debajo de la métrica
                     if st.button("💰 Reembolsos", key="btn_reembolsos", help="Gestionar reembolsos", type="primary"):
-                        mostrar_modal_reembolsos(mes, año, ingreso_base)
+                        mostrar_modal_reembolsos(mes, año, ingreso_base_data['importe'])
 
                 col3, col4 = st.columns(2)
 
