@@ -27,6 +27,16 @@ def inicializar_app():
     # NO usar cache para asegurar que siempre se crean las tablas nuevas
     db_manager.crear_tablas()
 
+    # Inicializar session_state para persistencia de mes/año entre pestañas
+    año_actual = datetime.date.today().year
+    mes_actual = datetime.date.today().month
+
+    if 'año_seleccionado' not in st.session_state:
+        st.session_state.año_seleccionado = año_actual
+
+    if 'mes_seleccionado' not in st.session_state:
+        st.session_state.mes_seleccionado = mes_actual
+
     # Migración automática: añadir campos 'pagado' y 'fecha_pago' si no existen
     try:
         conn = db_manager.get_db_connection()
@@ -221,14 +231,25 @@ def mostrar_dashboard():
     col_selector1, col_selector2, col_selector3, col_selector4 = st.columns([1, 1, 2, 1])
 
     año_actual = datetime.date.today().year
-    mes_actual = datetime.date.today().month
 
     with col_selector1:
-        año = st.selectbox("📅 Año", range(año_actual - 5, año_actual + 1), index=5)
+        # Calcular índice del año en session_state
+        años_disponibles = list(range(año_actual - 5, año_actual + 1))
+        index_año = años_disponibles.index(st.session_state.año_seleccionado) if st.session_state.año_seleccionado in años_disponibles else len(años_disponibles) - 1
+
+        año = st.selectbox("📅 Año", años_disponibles, index=index_año, key="dashboard_año")
+        # Actualizar session_state
+        st.session_state.año_seleccionado = año
 
     with col_selector2:
-        nombre_mes_seleccionado = st.selectbox("📆 Mes", list(NOMBRES_MESES.values()), index=mes_actual - 1)
+        # Calcular índice del mes en session_state
+        meses_disponibles = list(NOMBRES_MESES.values())
+        index_mes = st.session_state.mes_seleccionado - 1
+
+        nombre_mes_seleccionado = st.selectbox("📆 Mes", meses_disponibles, index=index_mes, key="dashboard_mes")
         mes = MESES_INVERTIDO[nombre_mes_seleccionado]
+        # Actualizar session_state
+        st.session_state.mes_seleccionado = mes
 
     with col_selector3:
         # Métrica Global: Líquido Disponible
@@ -320,6 +341,67 @@ def mostrar_dashboard():
                     delta=f"{balance_vs_base:.0f} €",
                     help="Porcentaje de tu ingreso base que has logrado ahorrar. Ideal: >20%. Mide tu capacidad de ahorro"
                 )
+
+                st.markdown("---")
+
+                # Desglose de Ingresos del Mes
+                with st.expander("💰 Desglose de Ingresos del Mes", expanded=False):
+                    ingresos_extra = metrics.obtener_ingresos_extraordinarios_mes(mes, año)
+                    total_ingresos_mes = ingreso_base + ingresos_extra['total']
+
+                    col1, col2, col3 = st.columns(3)
+
+                    col1.metric(
+                        "💼 Ingreso Base",
+                        f"{ingreso_base:.2f} €",
+                        help="Nómina regular (del mes anterior o actual según disponibilidad)"
+                    )
+
+                    col2.metric(
+                        "✨ Ingresos Extraordinarios",
+                        f"{ingresos_extra['total']:.2f} €",
+                        delta=f"{ingresos_extra['cantidad']} transacciones",
+                        help="Pagas extras, devoluciones IRPF, ventas, bonificaciones, etc."
+                    )
+
+                    col3.metric(
+                        "💵 Total Ingresos Mes",
+                        f"{total_ingresos_mes:.2f} €",
+                        help="Ingreso base + extraordinarios"
+                    )
+
+                    # Mostrar desglose detallado si hay ingresos extraordinarios
+                    if ingresos_extra['total'] > 0:
+                        st.markdown("**Detalle de Ingresos Extraordinarios:**")
+
+                        desglose = ingresos_extra['desglose']
+
+                        if desglose['pagas_extras'] > 0:
+                            st.caption(f"💼 Pagas extras / Nóminas adicionales: **{desglose['pagas_extras']:.2f} €**")
+
+                        if desglose['irpf_bonificaciones'] > 0:
+                            st.caption(f"🏦 Devoluciones IRPF / Bonificaciones: **{desglose['irpf_bonificaciones']:.2f} €**")
+
+                        if desglose['otros'] > 0:
+                            st.caption(f"🔄 Otros ingresos: **{desglose['otros']:.2f} €**")
+
+                        if desglose['sin_clasificar'] > 0:
+                            st.caption(f"❓ Sin clasificar: **{desglose['sin_clasificar']:.2f} €**")
+
+                        # Mostrar lista de transacciones
+                        st.markdown("**Transacciones:**")
+                        for t in ingresos_extra['transacciones']:
+                            categoria_icon = {
+                                'FIJOS': '💼',
+                                'EXTRAORDINARIOS': '🏦',
+                                'INGRESO': '💰',
+                                'SIN_CLASIFICAR': '❓'
+                            }.get(t.get('categoria'), '📌')
+
+                            concepto_corto = t['concepto'][:50] + "..." if len(t['concepto']) > 50 else t['concepto']
+                            st.caption(f"{categoria_icon} {t['fecha']} - {concepto_corto}: **{t['importe']:.2f} €**")
+                    else:
+                        st.info("No hay ingresos extraordinarios en este mes")
 
                 st.markdown("---")
 
@@ -1068,13 +1150,24 @@ def mostrar_transacciones():
     # --- Filtros ---
     col1, col2, col3 = st.columns(3)
     with col1:
-        # Usar valores por defecto para el mes y año actual
+        # Usar session_state compartido con Dashboard
         año_actual = datetime.date.today().year
-        mes_actual = datetime.date.today().month
-        año = st.selectbox("Año", range(año_actual - 5, año_actual + 1), index=5)
+        años_disponibles = list(range(año_actual - 5, año_actual + 1))
+        index_año = años_disponibles.index(st.session_state.año_seleccionado) if st.session_state.año_seleccionado in años_disponibles else len(años_disponibles) - 1
+
+        año = st.selectbox("Año", años_disponibles, index=index_año, key="trans_año")
+        # Actualizar session_state
+        st.session_state.año_seleccionado = año
+
     with col2:
-        nombre_mes_seleccionado = st.selectbox("Mes", list(NOMBRES_MESES.values()), index=mes_actual - 1, key="trans_mes_selector")
+        # Usar session_state compartido con Dashboard
+        meses_disponibles = list(NOMBRES_MESES.values())
+        index_mes = st.session_state.mes_seleccionado - 1
+
+        nombre_mes_seleccionado = st.selectbox("Mes", meses_disponibles, index=index_mes, key="trans_mes")
         mes = MESES_INVERTIDO[nombre_mes_seleccionado]
+        # Actualizar session_state
+        st.session_state.mes_seleccionado = mes
     with col3:
         # Obtener categorías de la base de datos para el filtro
         # Se podría mejorar el rendimiento cacheando esta llamada
