@@ -155,7 +155,7 @@ def obtener_totales_por_categoria(mes, año):
     query = """
         SELECT categoria, SUM(importe) as total
         FROM transacciones
-        WHERE tipo = 'GASTO' 
+        WHERE tipo = 'GASTO'
     """
     params = []
     if mes:
@@ -171,6 +171,66 @@ def obtener_totales_por_categoria(mes, año):
     totales = {row['categoria']: row['total'] for row in cursor.fetchall()}
     conn.close()
     return totales
+
+def obtener_gastos_netos_por_categoria(mes, año):
+    """
+    Calcula la suma de importes NETOS por categoría (gastos - reembolsos asignados).
+
+    Los reembolsos asignados a una categoría específica tienen el formato:
+    - categoria = 'REEMBOLSO'
+    - tipo = 'INGRESO'
+    - notas = 'REEMBOLSO_DE:{nombre_categoria}'
+
+    Args:
+        mes: Mes (1-12)
+        año: Año
+
+    Returns:
+        Dict con {categoria: importe_neto} (valores negativos)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Query para obtener gastos brutos y reembolsos por categoría
+    cursor.execute("""
+        WITH gastos_brutos AS (
+            SELECT
+                categoria,
+                SUM(importe) as total_bruto
+            FROM transacciones
+            WHERE tipo = 'GASTO'
+                AND mes = ?
+                AND año = ?
+            GROUP BY categoria
+        ),
+        reembolsos_categoria AS (
+            SELECT
+                REPLACE(notas, 'REEMBOLSO_DE:', '') as categoria,
+                SUM(importe) as total_reembolsos
+            FROM transacciones
+            WHERE categoria = 'REEMBOLSO'
+                AND tipo = 'INGRESO'
+                AND mes = ?
+                AND año = ?
+                AND notas LIKE 'REEMBOLSO_DE:%'
+            GROUP BY notas
+        )
+        SELECT
+            g.categoria,
+            g.total_bruto,
+            COALESCE(r.total_reembolsos, 0) as reembolsos,
+            g.total_bruto + COALESCE(r.total_reembolsos, 0) as total_neto
+        FROM gastos_brutos g
+        LEFT JOIN reembolsos_categoria r ON g.categoria = r.categoria
+    """, (mes, año, mes, año))
+
+    # Crear diccionario con totales netos
+    # Nota: total_bruto es negativo, total_reembolsos es positivo
+    # total_neto = total_bruto + total_reembolsos (resultado más cercano a 0)
+    totales_netos = {row['categoria']: row['total_neto'] for row in cursor.fetchall()}
+
+    conn.close()
+    return totales_netos
 
 def buscar_transacciones(termino_busqueda):
     """Busca transacciones cuyo concepto contenga un término de búsqueda."""

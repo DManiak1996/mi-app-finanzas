@@ -21,8 +21,8 @@ def calcular_totales_mes(mes, año):
 
     balance_neto = total_ingresos + gastos_netos # Gastos netos ya son negativos
 
-    # Obtener gastos por categoría (excluyendo reembolsos)
-    gastos_por_categoria = db_manager.obtener_totales_por_categoria(mes, año)
+    # Obtener gastos NETOS por categoría (restando reembolsos asignados)
+    gastos_por_categoria = db_manager.obtener_gastos_netos_por_categoria(mes, año)
 
     return {
         "total_ingresos": total_ingresos,
@@ -55,7 +55,23 @@ def calcular_totales_anual(año):
     gastos_netos = total_gastos + total_reembolsos
     balance_neto = total_ingresos + gastos_netos
 
-    gastos_por_categoria = df[df['tipo'] == 'GASTO'].groupby('categoria')['importe'].sum().to_dict()
+    # Calcular gastos NETOS por categoría para el año (gastos brutos - reembolsos asignados)
+    gastos_brutos_categoria = df[df['tipo'] == 'GASTO'].groupby('categoria')['importe'].sum()
+
+    # Reembolsos asignados por categoría
+    reembolsos_df = df[(df['categoria'] == 'REEMBOLSO') & (df['tipo'] == 'INGRESO') & (df['notas'].str.startswith('REEMBOLSO_DE:', na=False))].copy()
+    if not reembolsos_df.empty:
+        reembolsos_df['categoria_original'] = reembolsos_df['notas'].str.replace('REEMBOLSO_DE:', '')
+        reembolsos_por_categoria = reembolsos_df.groupby('categoria_original')['importe'].sum()
+    else:
+        reembolsos_por_categoria = pd.Series(dtype=float)
+
+    # Calcular netos: gastos_brutos + reembolsos (reembolsos son positivos, gastos son negativos)
+    gastos_por_categoria = {}
+    for cat in gastos_brutos_categoria.index:
+        bruto = gastos_brutos_categoria[cat]
+        reembolso = reembolsos_por_categoria.get(cat, 0)
+        gastos_por_categoria[cat] = bruto + reembolso  # Resultado es más cercano a 0
 
     # Evolución mensual con gastos netos
     evolucion_mensual = df.groupby(df['fecha'].dt.month).agg(
