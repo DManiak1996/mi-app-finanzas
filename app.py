@@ -210,9 +210,9 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
 # --- LOGO PREMIUM EN HEADER ---
 # No usar f-string con el SVG para evitar escape - usar componente HTML para bypass sanitizer
 header_html = f"""
-<div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(10, 76, 62, 0.1);">
-    <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG};">
-        <div id="header-logo-container"></div>
+<div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(10, 76, 62, 0.1); overflow-x: hidden;">
+    <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG}; overflow-x: hidden;">
+        <div id="header-logo-container" style="max-width: 100%; overflow: hidden;"></div>
     </div>
 </div>
 """
@@ -224,6 +224,13 @@ render_html(f"""
 const headerLogo = window.parent.document.querySelector('#header-logo-container');
 if (headerLogo) {{
     headerLogo.innerHTML = `{brand_assets.LOGO_SVG}`;
+    // Hacer logo responsive
+    const logoSvg = headerLogo.querySelector('svg');
+    if (logoSvg) {{
+        logoSvg.style.maxWidth = '100%';
+        logoSvg.style.height = 'auto';
+        logoSvg.style.display = 'block';
+    }}
 }}
 </script>
 """, height=0)
@@ -235,13 +242,21 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* === FONDO GLOBAL CON GRADIENTE === */
+html, body {{
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}}
+
 .stApp {{
     background: {Colors.PREMIUM_BG_GRADIENT} !important;
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
 }}
 
 .main .block-container {{
     max-width: {Config.MAX_CONTAINER_WIDTH} !important;
     padding-top: {Spacing.XXL} !important;
+    overflow-x: hidden !important;
 }}
 
 /* === SISTEMA TIPOGRÁFICO === */
