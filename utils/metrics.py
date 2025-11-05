@@ -14,7 +14,7 @@ def calcular_totales_mes(mes, año):
 
     total_ingresos = sum(t['importe'] for t in transacciones if t['tipo'] == 'INGRESO' and t.get('categoria') != 'REEMBOLSO')
     total_gastos = sum(t['importe'] for t in transacciones if t['tipo'] == 'GASTO')
-    total_reembolsos = sum(t['importe'] for t in transacciones if t.get('categoria') == 'REEMBOLSO')
+    total_reembolsos = sum(t['importe'] for t in transacciones if t.get('categoria') == 'REEMBOLSO' and t['tipo'] == 'INGRESO')
 
     # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
     gastos_netos = total_gastos + total_reembolsos
@@ -49,7 +49,7 @@ def calcular_totales_anual(año):
     # Separar ingresos regulares de reembolsos
     total_ingresos = df[(df['tipo'] == 'INGRESO') & (df['categoria'] != 'REEMBOLSO')]['importe'].sum()
     total_gastos = df[df['tipo'] == 'GASTO']['importe'].sum()
-    total_reembolsos = df[df['categoria'] == 'REEMBOLSO']['importe'].sum()
+    total_reembolsos = df[(df['categoria'] == 'REEMBOLSO') & (df['tipo'] == 'INGRESO')]['importe'].sum()
 
     # Gastos netos = gastos - reembolsos (total_gastos es negativo, total_reembolsos es positivo)
     gastos_netos = total_gastos + total_reembolsos
@@ -61,7 +61,7 @@ def calcular_totales_anual(año):
     evolucion_mensual = df.groupby(df['fecha'].dt.month).agg(
         ingresos=('importe', lambda x: x[(x > 0) & (df.loc[x.index, 'categoria'] != 'REEMBOLSO')].sum()),
         gastos=('importe', lambda x: x[x < 0].sum()),
-        reembolsos=('importe', lambda x: x[df.loc[x.index, 'categoria'] == 'REEMBOLSO'].sum())
+        reembolsos=('importe', lambda x: x[(df.loc[x.index, 'categoria'] == 'REEMBOLSO') & (df.loc[x.index, 'tipo'] == 'INGRESO')].sum())
     ).reindex(range(1, 13), fill_value=0)
     evolucion_mensual['gastos_netos'] = evolucion_mensual['gastos'] + evolucion_mensual['reembolsos']
     evolucion_mensual['balance'] = evolucion_mensual['ingresos'] + evolucion_mensual['gastos_netos']
@@ -102,7 +102,7 @@ def calcular_evolucion_mensual():
     df_agrupado = df_filtrado.groupby([df_filtrado['fecha'].dt.year.rename('año'), df_filtrado['fecha'].dt.month.rename('mes')]).apply(lambda x: pd.Series({
         'ingresos': x[(x['tipo'] == 'INGRESO') & (x['categoria'] != 'REEMBOLSO')]['importe'].sum(),
         'gastos': x[x['tipo'] == 'GASTO']['importe'].sum(),
-        'reembolsos': x[x['categoria'] == 'REEMBOLSO']['importe'].sum()
+        'reembolsos': x[(x['categoria'] == 'REEMBOLSO') & (x['tipo'] == 'INGRESO')]['importe'].sum()
     })).reset_index()
 
     df_agrupado['gastos_netos'] = df_agrupado['gastos'] + df_agrupado['reembolsos']
@@ -474,14 +474,23 @@ def calcular_financial_health_score(mes, año):
 
 def obtener_ingreso_base_mes(mes, año):
     """
-    Obtiene el ingreso base (normalmente nómina) del mes anterior.
-    Busca el ingreso más alto en los últimos 5 días del mes anterior.
-    Si no encuentra nada, busca en los primeros 5 días del mes actual (por si la nómina llegó tarde).
-    Si aún no hay, usa el ingreso total del mes actual.
+    Obtiene el ingreso base (nómina regular) del mes.
+
+    Estrategia mejorada para manejar casos especiales:
+    1. Busca nóminas (categoría FIJOS) en ventana temporal ampliada
+    2. Excluye EXTRAORDINARIOS (IRPF, bonificaciones)
+    3. Maneja múltiples nóminas (pagas extras) eligiendo solo la regular
+    4. Soporta nóminas tardías y casos edge (enero, febrero en marzo, etc.)
+
+    Returns:
+        float: Importe de la nómina regular del mes
     """
     from database import db_manager
     import calendar
-    
+
+    conn = db_manager.get_db_connection()
+    cursor = conn.cursor()
+
     # Calcular mes anterior
     if mes == 1:
         mes_anterior = 12
@@ -489,54 +498,134 @@ def obtener_ingreso_base_mes(mes, año):
     else:
         mes_anterior = mes - 1
         año_anterior = año
-    
-    # Obtener último día del mes anterior
+
+    # ESTRATEGIA 1: Buscar nómina (FIJOS) en últimos 7 días del mes anterior
+    # (ampliado de 5 a 7 para mayor flexibilidad)
     ultimo_dia_mes_anterior = calendar.monthrange(año_anterior, mes_anterior)[1]
-    
-    # Buscar ingresos en los últimos 5 días del mes anterior
-    conn = db_manager.get_db_connection()
-    cursor = conn.cursor()
-    
-    # Intentar primero en los últimos 5 días del mes anterior
+
+    cursor.execute("""
+        SELECT importe, fecha
+        FROM transacciones
+        WHERE tipo = 'INGRESO'
+        AND categoria = 'FIJOS'
+        AND mes = ?
+        AND año = ?
+        AND CAST(strftime('%d', fecha) AS INTEGER) >= ?
+        ORDER BY importe DESC
+        LIMIT 1
+    """, (mes_anterior, año_anterior, max(1, ultimo_dia_mes_anterior - 6)))
+
+    resultado = cursor.fetchone()
+    if resultado and resultado['importe']:
+        conn.close()
+        return resultado['importe']
+
+    # ESTRATEGIA 2: Buscar nómina en primeros 10 días del mes actual
+    # (para nóminas tardías como febrero pagada en marzo)
+    cursor.execute("""
+        SELECT importe, fecha
+        FROM transacciones
+        WHERE tipo = 'INGRESO'
+        AND categoria = 'FIJOS'
+        AND mes = ?
+        AND año = ?
+        AND CAST(strftime('%d', fecha) AS INTEGER) <= 10
+        ORDER BY importe DESC
+        LIMIT 1
+    """, (mes, año))
+
+    resultado = cursor.fetchone()
+    if resultado and resultado['importe']:
+        conn.close()
+        return resultado['importe']
+
+    # ESTRATEGIA 3: Si hay múltiples FIJOS en el mes (pagas extras),
+    # tomar el más frecuente o el primero cronológicamente
+    cursor.execute("""
+        SELECT importe, COUNT(*) as frecuencia, MIN(fecha) as primera_fecha
+        FROM transacciones
+        WHERE tipo = 'INGRESO'
+        AND categoria = 'FIJOS'
+        AND mes = ?
+        AND año = ?
+        GROUP BY importe
+        ORDER BY frecuencia DESC, primera_fecha ASC
+        LIMIT 1
+    """, (mes, año))
+
+    resultado = cursor.fetchone()
+    if resultado and resultado['importe']:
+        conn.close()
+        return resultado['importe']
+
+    # ESTRATEGIA 4: Buscar cualquier ingreso alto (>500€) que no sea EXTRAORDINARIOS
+    # (para casos donde la nómina no está bien clasificada)
     cursor.execute("""
         SELECT MAX(importe) as max_ingreso
         FROM transacciones
         WHERE tipo = 'INGRESO'
+        AND categoria != 'EXTRAORDINARIOS'
+        AND categoria != 'REEMBOLSO'
+        AND importe > 500
         AND mes = ?
         AND año = ?
-        AND CAST(strftime('%d', fecha) AS INTEGER) >= ?
-    """, (mes_anterior, año_anterior, ultimo_dia_mes_anterior - 4))
-    
+    """, (mes, año))
+
     resultado = cursor.fetchone()
-    max_ingreso = resultado['max_ingreso'] if resultado and resultado['max_ingreso'] else 0
-    
-    # Si no encontró nada, buscar en los primeros 5 días del mes actual
-    if max_ingreso == 0:
-        cursor.execute("""
-            SELECT MAX(importe) as max_ingreso
-            FROM transacciones
-            WHERE tipo = 'INGRESO'
-            AND mes = ?
-            AND año = ?
-            AND CAST(strftime('%d', fecha) AS INTEGER) <= 5
-        """, (mes, año))
-        
-        resultado = cursor.fetchone()
-        max_ingreso = resultado['max_ingreso'] if resultado and resultado['max_ingreso'] else 0
-    
-    # Si aún no hay, usar el ingreso total del mes actual
-    if max_ingreso == 0:
-        cursor.execute("""
-            SELECT SUM(importe) as total_ingreso
-            FROM transacciones
-            WHERE tipo = 'INGRESO'
-            AND mes = ?
-            AND año = ?
-        """, (mes, año))
-        
-        resultado = cursor.fetchone()
-        max_ingreso = resultado['total_ingreso'] if resultado and resultado['total_ingreso'] else 0
-    
+    if resultado and resultado['max_ingreso']:
+        conn.close()
+        return resultado['max_ingreso']
+
+    # FALLBACK: Devolver 0 si no se encuentra nada
+    # (mejor que sumar todo, evita errores en meses sin nómina)
     conn.close()
-    
-    return max_ingreso
+    return 0.0
+
+def obtener_ingresos_extraordinarios_mes(mes, año):
+    """
+    Obtiene los ingresos extraordinarios del mes (excluyendo nómina regular y reembolsos):
+    - Pagas extras
+    - Devoluciones IRPF
+    - Ventas segunda mano
+    - Bonificaciones
+    - Otros ingresos no regulares
+
+    Returns:
+        Dict con total, lista de transacciones y desglose por tipo
+    """
+    from database import db_manager
+
+    transacciones = db_manager.obtener_transacciones(mes=mes, año=año)
+
+    # Obtener la nómina regular para excluirla
+    ingreso_base = obtener_ingreso_base_mes(mes, año)
+
+    ingresos_extraordinarios = []
+
+    for t in transacciones:
+        # Solo ingresos, no reembolsos
+        if t['tipo'] != 'INGRESO' or t.get('categoria') == 'REEMBOLSO':
+            continue
+
+        # Excluir la nómina regular (con tolerancia de 1€ por si hay variaciones)
+        if ingreso_base > 0 and abs(t['importe'] - ingreso_base) < 1.0:
+            continue
+
+        ingresos_extraordinarios.append(t)
+
+    # Calcular totales y desglose
+    total = sum(t['importe'] for t in ingresos_extraordinarios)
+
+    desglose = {
+        'pagas_extras': sum(t['importe'] for t in ingresos_extraordinarios if t.get('categoria') == 'FIJOS'),
+        'irpf_bonificaciones': sum(t['importe'] for t in ingresos_extraordinarios if t.get('categoria') == 'EXTRAORDINARIOS'),
+        'otros': sum(t['importe'] for t in ingresos_extraordinarios if t.get('categoria') not in ['FIJOS', 'EXTRAORDINARIOS', 'INGRESO'] and t.get('categoria') is not None),
+        'sin_clasificar': sum(t['importe'] for t in ingresos_extraordinarios if t.get('categoria') == 'INGRESO' or t.get('categoria') is None or t.get('categoria') == 'SIN_CLASIFICAR')
+    }
+
+    return {
+        'total': round(total, 2),
+        'cantidad': len(ingresos_extraordinarios),
+        'transacciones': ingresos_extraordinarios,
+        'desglose': desglose
+    }
