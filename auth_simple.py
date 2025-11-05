@@ -2,6 +2,7 @@
 
 import streamlit as st
 import time
+from streamlit.components.v1 import html as render_html
 from utils import brand_assets
 from utils.design_tokens import Colors, Typography, Spacing, BorderRadius, Transitions
 
@@ -118,15 +119,10 @@ def show_premium_login(authorized_email, correct_password):
     col1, col2, col3 = st.columns([1, 2.5, 1])
 
     with col2:
-        # === LOGO PREMIUM ===
-        # No usar f-string con el SVG para evitar escape
-        login_card_html = f"""
+        # === LOGO PREMIUM CON COMPONENTE HTML (bypasea el sanitizer) ===
+        st.markdown(f"""
 <div class="login-container" style="background: {Colors.PREMIUM_CARD_GRADIENT}; padding: {Spacing.XXL}; border-radius: {BorderRadius.XL}; box-shadow: 0 20px 25px rgba(0,0,0,0.10), 0 10px 10px rgba(0,0,0,0.04); border: 1px solid rgba(102, 126, 234, 0.1); backdrop-filter: blur(10px); text-align: center;">
-    <div style="margin-bottom: {Spacing.XL}; display: flex; justify-content: center;">
-"""
-        login_card_html += brand_assets.LOGO_SVG
-        login_card_html += f"""
-    </div>
+    <div id="logo-container" style="margin-bottom: {Spacing.XL}; display: flex; justify-content: center;"></div>
     <h1 style="font-size: {Typography.TEXT_4XL}; font-weight: {Typography.WEIGHT_EXTRABOLD}; margin-bottom: {Spacing.SM}; background: {Colors.PREMIUM_GRADIENT_PRIMARY}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
         Bienvenido
     </h1>
@@ -134,8 +130,17 @@ def show_premium_login(authorized_email, correct_password):
         Accede a tu control financiero premium
     </p>
 </div>
-"""
-        st.markdown(login_card_html, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+
+        # Renderizar SVG usando componente HTML (bypasea sanitizer)
+        render_html(f"""
+        <script>
+        const logoContainer = window.parent.document.querySelector('#logo-container');
+        if (logoContainer) {{
+            logoContainer.innerHTML = `{brand_assets.LOGO_SVG}`;
+        }}
+        </script>
+        """, height=0)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
