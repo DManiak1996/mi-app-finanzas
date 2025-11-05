@@ -38,14 +38,14 @@ LOGO_SVG = """
     </g>
 
     <text x="54" y="20"
-          font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
           font-size="18"
           font-weight="700"
           fill="#262730">
         FinanzasFlow
     </text>
     <text x="54" y="36"
-          font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
           font-size="9"
           font-weight="500"
           fill="#757575"
