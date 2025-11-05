@@ -565,6 +565,7 @@ section[data-testid="stSidebar"] .stRadio label {{
     border-radius: {BorderRadius.BASE} !important;
     transition: all {Transitions.FAST} {Transitions.EASING_DEFAULT} !important;
     font-weight: {Typography.WEIGHT_MEDIUM} !important;
+    position: relative !important;
 }}
 
 section[data-testid="stSidebar"] .stRadio label:hover {{
@@ -576,6 +577,24 @@ section[data-testid="stSidebar"] .stRadio label[data-checked="true"] {{
     background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
     color: white !important;
     box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+}}
+
+/* Estilo minimal para navegación - ocultar círculos de radio buttons */
+section[data-testid="stSidebar"] .stRadio input[type="radio"] {{
+    display: none !important;
+}}
+
+/* Indicador minimal en lugar de círculo */
+section[data-testid="stSidebar"] .stRadio label[data-checked="true"]::before {{
+    content: '' !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 4px !important;
+    height: 70% !important;
+    background: {Colors.PREMIUM_PRIMARY_END} !important;
+    border-radius: 0 4px 4px 0 !important;
 }}
 
 /* === ⚡ ANIMACIONES Y MICRO-INTERACCIONES === */
@@ -716,6 +735,77 @@ html {{
 }}
 </style>
 """, unsafe_allow_html=True)
+
+# --- SWIPE GESTURES PARA SIDEBAR MOBILE ---
+render_html("""
+<script>
+(function() {
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let touchStartY = 0;
+    let touchEndY = 0;
+
+    const sidebar = window.parent.document.querySelector('section[data-testid="stSidebar"]');
+    const sidebarCollapseButton = window.parent.document.querySelector('button[kind="header"]');
+
+    if (!sidebar) return;
+
+    // Detectar swipe desde el borde izquierdo para abrir sidebar
+    window.parent.document.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    window.parent.document.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const swipeDistanceX = touchEndX - touchStartX;
+        const swipeDistanceY = Math.abs(touchEndY - touchStartY);
+
+        // Solo procesar swipes horizontales (más horizontal que vertical)
+        if (Math.abs(swipeDistanceX) < swipeDistanceY) return;
+
+        // Swipe desde el borde izquierdo hacia la derecha (abrir sidebar)
+        if (touchStartX < 50 && swipeDistanceX > 100) {
+            const sidebarClass = sidebar.getAttribute('class');
+            // Solo abrir si está colapsado
+            if (sidebarClass && sidebarClass.includes('collapsed')) {
+                // Buscar y clickear el botón de expandir
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.getAttribute('aria-label') === 'Open sidebar') {
+                        btn.click();
+                    }
+                });
+            }
+        }
+
+        // Swipe desde dentro del sidebar hacia la izquierda (cerrar sidebar)
+        if (swipeDistanceX < -100) {
+            const sidebarBounds = sidebar.getBoundingClientRect();
+            // Verificar que el swipe empezó dentro del sidebar
+            if (touchStartX < sidebarBounds.right) {
+                const sidebarClass = sidebar.getAttribute('class');
+                // Solo cerrar si está expandido
+                if (sidebarClass && !sidebarClass.includes('collapsed')) {
+                    // Buscar y clickear el botón de colapsar
+                    const buttons = window.parent.document.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        if (btn.getAttribute('aria-label') === 'Close sidebar') {
+                            btn.click();
+                        }
+                    });
+                }
+            }
+        }
+    }
+})();
+</script>
+""", height=0)
 
 # --- Barra lateral de navegación ---
 st.sidebar.title("Navegación")
