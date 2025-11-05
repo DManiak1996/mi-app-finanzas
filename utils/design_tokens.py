@@ -99,6 +99,67 @@ class Colors:
     GRADIENT_SUCCESS = f"linear-gradient(135deg, {SUCCESS_ULTRA_LIGHT} 0%, {SUCCESS_LIGHT}30 100%)"
     GRADIENT_ERROR = f"linear-gradient(135deg, {ERROR_ULTRA_LIGHT} 0%, {ERROR_LIGHT}30 100%)"
 
+    # === 🎨 FINTECH PREMIUM PALETTE ===
+    # Gradientes vibrantes para UI premium
+    PREMIUM_PRIMARY_START = "#667eea"      # Azul-violeta brillante
+    PREMIUM_PRIMARY_END = "#764ba2"        # Violeta profundo
+    PREMIUM_GRADIENT_PRIMARY = f"linear-gradient(135deg, {PREMIUM_PRIMARY_START} 0%, {PREMIUM_PRIMARY_END} 100%)"
+
+    # Gradientes de acento
+    PREMIUM_GOLD_START = "#f6d365"         # Dorado suave
+    PREMIUM_GOLD_END = "#fda085"           # Coral-naranja
+    PREMIUM_GRADIENT_GOLD = f"linear-gradient(135deg, {PREMIUM_GOLD_START} 0%, {PREMIUM_GOLD_END} 100%)"
+
+    PREMIUM_TEAL_START = "#11998e"         # Verde menta profundo
+    PREMIUM_TEAL_END = "#38ef7d"           # Verde menta brillante
+    PREMIUM_GRADIENT_TEAL = f"linear-gradient(135deg, {PREMIUM_TEAL_START} 0%, {PREMIUM_TEAL_END} 100%)"
+
+    PREMIUM_CORAL_START = "#fa709a"        # Rosa coral
+    PREMIUM_CORAL_END = "#fee140"          # Amarillo suave
+    PREMIUM_GRADIENT_CORAL = f"linear-gradient(135deg, {PREMIUM_CORAL_START} 0%, {PREMIUM_CORAL_END} 100%)"
+
+    PREMIUM_SKY_START = "#4facfe"          # Azul cielo
+    PREMIUM_SKY_END = "#00f2fe"            # Cyan brillante
+    PREMIUM_GRADIENT_SKY = f"linear-gradient(135deg, {PREMIUM_SKY_START} 0%, {PREMIUM_SKY_END} 100%)"
+
+    # Gradiente de fondo sutil
+    PREMIUM_BG_GRADIENT = "linear-gradient(180deg, #ffffff 0%, #f8f9fe 100%)"
+    PREMIUM_CARD_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #f5f7ff 100%)"
+
+    # === 💎 GLASSMORPHISM ===
+    GLASS_BG = "rgba(255, 255, 255, 0.7)"
+    GLASS_BG_DARK = "rgba(255, 255, 255, 0.1)"
+    GLASS_BORDER = "rgba(255, 255, 255, 0.3)"
+    GLASS_BACKDROP = "blur(10px)"
+    GLASS_SHADOW = "0 8px 32px rgba(31, 38, 135, 0.15)"
+
+    # === 🌈 SOMBRAS MULTICAPA (Profundidad realista) ===
+    SHADOW_PREMIUM_XS = "0 1px 2px rgba(0,0,0,0.05)"
+    SHADOW_PREMIUM_SM = """0 2px 4px rgba(0,0,0,0.06),
+                           0 1px 2px rgba(0,0,0,0.04)"""
+    SHADOW_PREMIUM_MD = """0 4px 6px rgba(0,0,0,0.07),
+                           0 2px 4px rgba(0,0,0,0.05),
+                           0 1px 2px rgba(0,0,0,0.04)"""
+    SHADOW_PREMIUM_LG = """0 10px 15px rgba(0,0,0,0.08),
+                           0 4px 6px rgba(0,0,0,0.06),
+                           0 2px 4px rgba(0,0,0,0.04)"""
+    SHADOW_PREMIUM_XL = """0 20px 25px rgba(0,0,0,0.10),
+                           0 10px 10px rgba(0,0,0,0.04),
+                           0 0 0 1px rgba(0,0,0,0.02)"""
+    SHADOW_PREMIUM_2XL = """0 25px 50px rgba(0,0,0,0.15),
+                            0 12px 25px rgba(0,0,0,0.08)"""
+
+    # Sombras con color (glow effects)
+    SHADOW_GLOW_PRIMARY = "0 0 20px rgba(102, 126, 234, 0.4)"    # #667eea con alpha
+    SHADOW_GLOW_SUCCESS = "0 0 20px rgba(17, 153, 142, 0.4)"     # #11998e con alpha
+    SHADOW_GLOW_ERROR = "0 0 20px rgba(250, 112, 154, 0.4)"      # #fa709a con alpha
+
+    # === 🎯 ACENTOS PREMIUM ===
+    ACCENT_GOLD = PREMIUM_GOLD_START       # Para highlights especiales
+    ACCENT_CORAL = PREMIUM_CORAL_START     # Para CTAs importantes
+    ACCENT_TEAL = PREMIUM_TEAL_START       # Para info y success
+    ACCENT_SKY = PREMIUM_SKY_START         # Para links y acciones secundarias
+
 
 class Typography:
     """Sistema tipográfico basado en mejores prácticas de legibilidad"""

@@ -3,7 +3,8 @@
 import streamlit as st
 from database import db_manager
 from utils import metrics, visualizer, excel_reader, categorizer, sync, coche_electrico, config_manager
-from utils.design_tokens import Colors, Typography, Spacing, BorderRadius, get_budget_color, spacer_html
+from utils.design_tokens import Colors, Typography, Spacing, BorderRadius, Transitions, Config, get_budget_color, spacer_html
+from utils import brand_assets
 import datetime
 import pandas as pd
 import json
@@ -32,8 +33,18 @@ def inicializar_app():
     año_actual = datetime.date.today().year
     mes_actual = datetime.date.today().month
 
+    # Detectar cambio de año automáticamente
+    # Si ya había un año seleccionado pero ahora es un nuevo año, actualizarlo
     if 'año_seleccionado' not in st.session_state:
         st.session_state.año_seleccionado = año_actual
+        st.session_state.ultimo_año_real = año_actual  # Guardar año real para detectar cambios
+    elif 'ultimo_año_real' not in st.session_state:
+        # Primera vez que añadimos esta lógica, guardar el año real actual
+        st.session_state.ultimo_año_real = año_actual
+    elif st.session_state.ultimo_año_real != año_actual:
+        # ¡Ha cambiado el año real! Actualizar automáticamente al nuevo año
+        st.session_state.año_seleccionado = año_actual
+        st.session_state.ultimo_año_real = año_actual
 
     if 'mes_seleccionado' not in st.session_state:
         st.session_state.mes_seleccionado = mes_actual
@@ -195,29 +206,52 @@ def mostrar_modal_reembolsos(mes, año, ingreso_base):
     else:
         st.success("✅ No hay ingresos pendientes de clasificar como reembolsos")
 
-
-# --- CSS personalizado con Design System ---
+# --- CSS FINTECH PREMIUM COMPLETO ---
 st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+<!-- Logo Premium en Header -->
+<div style="padding: {Spacing.LG} 0; margin-bottom: {Spacing.XL}; background: {Colors.PREMIUM_BG_GRADIENT}; border-bottom: 1px solid rgba(102, 126, 234, 0.1);">
+    <div style="max-width: {Config.MAX_CONTAINER_WIDTH}; margin: 0 auto; padding: 0 {Spacing.LG};">
+        {brand_assets.LOGO_SVG}
+    </div>
+</div>
 
-/* ========== SISTEMA TIPOGRÁFICO ========== */
+<style>
+/* ========== 🎨 FINTECH PREMIUM CSS ========== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* === FONDO GLOBAL CON GRADIENTE === */
+.stApp {{
+    background: {Colors.PREMIUM_BG_GRADIENT} !important;
+}}
+
+.main .block-container {{
+    max-width: {Config.MAX_CONTAINER_WIDTH} !important;
+    padding-top: {Spacing.XXL} !important;
+}}
+
+/* === SISTEMA TIPOGRÁFICO === */
 html, body, [class*="css"] {{
     font-family: {Typography.FONT_PRIMARY} !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
 }}
 
 h1 {{
     font-size: {Typography.TEXT_4XL} !important;
-    font-weight: {Typography.WEIGHT_BOLD} !important;
+    font-weight: {Typography.WEIGHT_EXTRABOLD} !important;
     line-height: {Typography.LEADING_TIGHT} !important;
     letter-spacing: {Typography.TRACKING_TIGHT} !important;
     color: {Colors.GRAY_900} !important;
     margin-bottom: {Spacing.LG} !important;
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
 }}
 
 h2 {{
     font-size: {Typography.TEXT_3XL} !important;
-    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    font-weight: {Typography.WEIGHT_BOLD} !important;
     line-height: {Typography.LEADING_SNUG} !important;
     color: {Colors.GRAY_900} !important;
     margin-bottom: {Spacing.BASE} !important;
@@ -231,59 +265,50 @@ h3 {{
     margin-bottom: {Spacing.MD} !important;
 }}
 
-p, .stMarkdown, div[data-testid="stText"] {{
-    font-size: {Typography.TEXT_BASE} !important;
-    line-height: {Typography.LEADING_RELAXED} !important;
-    color: {Colors.GRAY_900} !important;
-}}
-
-label, .stMarkdown small, caption {{
-    font-size: {Typography.TEXT_SM} !important;
-    font-weight: {Typography.WEIGHT_MEDIUM} !important;
-    color: {Colors.GRAY_700} !important;
-}}
-
-/* ========== BOTONES ========== */
-.stButton button {{
-    min-height: 44px !important;
-    padding: {Spacing.MD} {Spacing.LG} !important;
-    font-size: {Typography.TEXT_BASE} !important;
-    border-radius: {BorderRadius.BASE} !important;
-    font-weight: {Typography.WEIGHT_MEDIUM} !important;
-    transition: all 0.2s ease !important;
-}}
-
-.stButton button[kind="primary"] {{
-    min-height: 48px !important;
-    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
-    background-color: {Colors.PRIMARY} !important;
-    box-shadow: {Colors.SHADOW_SM} !important;
-}}
-
-.stButton button[kind="primary"]:hover {{
-    transform: translateY(-2px) !important;
-    box-shadow: {Colors.SHADOW_MD} !important;
-}}
-
-.stButton button[kind="secondary"] {{
-    border: 1px solid {Colors.GRAY_300} !important;
-}}
-
-/* ========== INPUTS ========== */
-.stTextInput input, .stNumberInput input, .stSelectbox select {{
-    min-height: 44px !important;
-    font-size: {Typography.TEXT_BASE} !important;
-    border-radius: {BorderRadius.SM} !important;
-    border-color: {Colors.GRAY_300} !important;
-}}
-
-/* ========== MÉTRICAS ========== */
-.stMetric {{
-    background: {Colors.GRADIENT_PRIMARY} !important;
+/* === 💎 CARDS PREMIUM CON GLASSMORPHISM === */
+div[data-testid="column"] > div {{
+    background: {Colors.PREMIUM_CARD_GRADIENT} !important;
+    border-radius: {BorderRadius.LG} !important;
     padding: {Spacing.LG} !important;
-    border-radius: {BorderRadius.BASE} !important;
-    border: 1px solid {Colors.GRAY_200} !important;
-    box-shadow: {Colors.SHADOW_SM} !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+    backdrop-filter: blur(10px) !important;
+    transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
+}}
+
+div[data-testid="column"] > div:hover {{
+    transform: translateY(-4px) !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
+    border-color: rgba(102, 126, 234, 0.15) !important;
+}}
+
+/* === 🎯 MÉTRICAS PREMIUM === */
+.stMetric {{
+    background: {Colors.PREMIUM_CARD_GRADIENT} !important;
+    padding: {Spacing.XL} !important;
+    border-radius: {BorderRadius.LG} !important;
+    border: 1px solid rgba(102, 126, 234, 0.1) !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+    backdrop-filter: blur(10px) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
+}}
+
+.stMetric:hover {{
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
+    border-color: rgba(102, 126, 234, 0.2) !important;
+}}
+
+.stMetric::before {{
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 4px !important;
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
 }}
 
 .stMetric label {{
@@ -292,22 +317,293 @@ label, .stMarkdown small, caption {{
     text-transform: uppercase !important;
     letter-spacing: {Typography.TRACKING_WIDER} !important;
     color: {Colors.GRAY_700} !important;
+    margin-bottom: {Spacing.SM} !important;
 }}
 
 .stMetric [data-testid="stMetricValue"] {{
-    font-size: {Typography.TEXT_4XL} !important;
-    font-weight: {Typography.WEIGHT_BOLD} !important;
+    font-size: {Typography.TEXT_5XL} !important;
+    font-weight: {Typography.WEIGHT_EXTRABOLD} !important;
     line-height: {Typography.LEADING_NONE} !important;
-    color: {Colors.GRAY_900} !important;
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
     font-feature-settings: 'tnum' 1 !important;
+    margin-bottom: {Spacing.SM} !important;
 }}
 
 .stMetric [data-testid="stMetricDelta"] {{
     font-size: {Typography.TEXT_SM} !important;
     font-weight: {Typography.WEIGHT_MEDIUM} !important;
+    padding: {Spacing.XS} {Spacing.MD} !important;
+    border-radius: {BorderRadius.FULL} !important;
+    background: rgba(102, 126, 234, 0.08) !important;
+    display: inline-block !important;
 }}
 
-/* ========== RESPONSIVE MÓVIL ========== */
+/* === 🔘 BOTONES PREMIUM CON GRADIENTES === */
+.stButton button {{
+    min-height: 48px !important;
+    padding: {Spacing.MD} {Spacing.XL} !important;
+    font-size: {Typography.TEXT_BASE} !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    border-radius: {BorderRadius.MD} !important;
+    border: none !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+    transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
+    position: relative !important;
+    overflow: hidden !important;
+}}
+
+.stButton button[kind="primary"] {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+}}
+
+.stButton button[kind="primary"]:hover {{
+    transform: translateY(-2px) scale(1.05) !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_LG}, {Colors.SHADOW_GLOW_PRIMARY} !important;
+}}
+
+.stButton button[kind="primary"]:active {{
+    transform: translateY(0) scale(0.98) !important;
+}}
+
+/* Efecto ripple en botones */
+.stButton button::after {{
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.3) !important;
+    transform: translate(-50%, -50%) !important;
+    transition: width 0.6s, height 0.6s !important;
+}}
+
+.stButton button:active::after {{
+    width: 300px !important;
+    height: 300px !important;
+}}
+
+.stButton button[kind="secondary"] {{
+    background: white !important;
+    border: 2px solid rgba(102, 126, 234, 0.2) !important;
+    color: {Colors.PREMIUM_PRIMARY_START} !important;
+}}
+
+.stButton button[kind="secondary"]:hover {{
+    background: rgba(102, 126, 234, 0.05) !important;
+    border-color: rgba(102, 126, 234, 0.4) !important;
+    transform: translateY(-2px) !important;
+}}
+
+/* === 📊 GRÁFICOS PREMIUM === */
+.js-plotly-plot {{
+    border-radius: {BorderRadius.LG} !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+    background: {Colors.PREMIUM_CARD_GRADIENT} !important;
+    padding: {Spacing.LG} !important;
+    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+    backdrop-filter: blur(10px) !important;
+    transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
+}}
+
+.js-plotly-plot:hover {{
+    box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
+    transform: translateY(-2px) !important;
+}}
+
+/* === 📝 INPUTS PREMIUM === */
+.stTextInput input, .stNumberInput input, .stSelectbox select, .stDateInput input {{
+    min-height: 48px !important;
+    font-size: {Typography.TEXT_BASE} !important;
+    border-radius: {BorderRadius.MD} !important;
+    border: 2px solid rgba(102, 126, 234, 0.15) !important;
+    background: white !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_XS} !important;
+    transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT} !important;
+    padding: {Spacing.MD} {Spacing.LG} !important;
+}}
+
+.stTextInput input:focus, .stNumberInput input:focus, .stSelectbox select:focus {{
+    border-color: {Colors.PREMIUM_PRIMARY_START} !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1), {Colors.SHADOW_PREMIUM_SM} !important;
+    outline: none !important;
+}}
+
+/* === 🔖 TABS PREMIUM === */
+.stTabs [data-baseweb="tab-list"] {{
+    background: white !important;
+    border-radius: {BorderRadius.LG} !important;
+    padding: {Spacing.SM} !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+    gap: {Spacing.SM} !important;
+}}
+
+.stTabs [data-baseweb="tab"] {{
+    padding: {Spacing.MD} {Spacing.XL} !important;
+    font-size: {Typography.TEXT_BASE} !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    border-radius: {BorderRadius.BASE} !important;
+    transition: all {Transitions.FAST} {Transitions.EASING_DEFAULT} !important;
+    color: {Colors.GRAY_700} !important;
+}}
+
+.stTabs [data-baseweb="tab"]:hover {{
+    background: rgba(102, 126, 234, 0.08) !important;
+    color: {Colors.PREMIUM_PRIMARY_START} !important;
+}}
+
+.stTabs [data-baseweb="tab"][aria-selected="true"] {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+}}
+
+/* === 📋 TABLAS PREMIUM === */
+.stDataFrame {{
+    border-radius: {BorderRadius.LG} !important;
+    overflow: hidden !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+    border: 1px solid rgba(102, 126, 234, 0.08) !important;
+}}
+
+.stDataFrame thead tr th {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+    font-weight: {Typography.WEIGHT_SEMIBOLD} !important;
+    text-transform: uppercase !important;
+    font-size: {Typography.TEXT_SM} !important;
+    letter-spacing: {Typography.TRACKING_WIDER} !important;
+    padding: {Spacing.LG} !important;
+}}
+
+.stDataFrame tbody tr {{
+    transition: all {Transitions.FAST} {Transitions.EASING_DEFAULT} !important;
+}}
+
+.stDataFrame tbody tr:hover {{
+    background: rgba(102, 126, 234, 0.05) !important;
+    transform: scale(1.01) !important;
+}}
+
+.stDataFrame tbody tr td {{
+    padding: {Spacing.LG} !important;
+    font-size: {Typography.TEXT_BASE} !important;
+}}
+
+/* === 📢 ALERTAS Y MENSAJES PREMIUM === */
+.stAlert {{
+    border-radius: {BorderRadius.LG} !important;
+    border: none !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+    padding: {Spacing.LG} {Spacing.XL} !important;
+    backdrop-filter: blur(10px) !important;
+}}
+
+.stSuccess {{
+    background: linear-gradient(135deg, rgba(17, 153, 142, 0.1) 0%, rgba(56, 239, 125, 0.05) 100%) !important;
+    border-left: 4px solid {Colors.PREMIUM_TEAL_START} !important;
+}}
+
+.stError {{
+    background: linear-gradient(135deg, rgba(250, 112, 154, 0.1) 0%, rgba(254, 225, 64, 0.05) 100%) !important;
+    border-left: 4px solid {Colors.PREMIUM_CORAL_START} !important;
+}}
+
+.stInfo {{
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.1) 0%, rgba(0, 242, 254, 0.05) 100%) !important;
+    border-left: 4px solid {Colors.PREMIUM_SKY_START} !important;
+}}
+
+.stWarning {{
+    background: linear-gradient(135deg, rgba(246, 211, 101, 0.1) 0%, rgba(253, 160, 133, 0.05) 100%) !important;
+    border-left: 4px solid {Colors.PREMIUM_GOLD_START} !important;
+}}
+
+/* === 🎭 MODALS/DIALOGS GLASSMORPHISM === */
+div[data-testid="stModal"] > div {{
+    background: {Colors.GLASS_BG} !important;
+    backdrop-filter: blur(20px) !important;
+    border-radius: {BorderRadius.XL} !important;
+    border: 1px solid {Colors.GLASS_BORDER} !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_2XL} !important;
+}}
+
+/* === 🎪 SIDEBAR PREMIUM === */
+section[data-testid="stSidebar"] {{
+    background: {Colors.PREMIUM_CARD_GRADIENT} !important;
+    border-right: 1px solid rgba(102, 126, 234, 0.1) !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
+}}
+
+section[data-testid="stSidebar"] .stRadio > div {{
+    gap: {Spacing.SM} !important;
+}}
+
+section[data-testid="stSidebar"] .stRadio label {{
+    padding: {Spacing.MD} {Spacing.LG} !important;
+    border-radius: {BorderRadius.BASE} !important;
+    transition: all {Transitions.FAST} {Transitions.EASING_DEFAULT} !important;
+    font-weight: {Typography.WEIGHT_MEDIUM} !important;
+}}
+
+section[data-testid="stSidebar"] .stRadio label:hover {{
+    background: rgba(102, 126, 234, 0.08) !important;
+    transform: translateX(4px) !important;
+}}
+
+section[data-testid="stSidebar"] .stRadio label[data-checked="true"] {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_SM} !important;
+}}
+
+/* === ⚡ ANIMACIONES Y MICRO-INTERACCIONES === */
+@keyframes fadeInUp {{
+    from {{
+        opacity: 0;
+        transform: translateY(20px);
+    }}
+    to {{
+        opacity: 1;
+        transform: translateY(0);
+    }}
+}}
+
+@keyframes pulse {{
+    0%, 100% {{
+        opacity: 1;
+    }}
+    50% {{
+        opacity: 0.5;
+    }}
+}}
+
+@keyframes shimmer {{
+    0% {{
+        background-position: -1000px 0;
+    }}
+    100% {{
+        background-position: 1000px 0;
+    }}
+}}
+
+.stMetric, div[data-testid="column"] > div, .js-plotly-plot {{
+    animation: fadeInUp 0.6s {Transitions.EASING_DEFAULT} !important;
+}}
+
+/* Loading state shimmer effect */
+.stSpinner > div {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    animation: pulse 1.5s ease-in-out infinite !important;
+}}
+
+/* === 📱 RESPONSIVE MÓVIL === */
 @media (max-width: 768px) {{
     .main .block-container {{
         padding-left: {Spacing.BASE} !important;
@@ -318,8 +614,12 @@ label, .stMarkdown small, caption {{
     h2 {{ font-size: {Typography.TEXT_2XL} !important; }}
     h3 {{ font-size: {Typography.TEXT_XL} !important; }}
 
+    .stMetric {{
+        padding: {Spacing.LG} !important;
+    }}
+
     .stMetric [data-testid="stMetricValue"] {{
-        font-size: {Typography.TEXT_2XL} !important;
+        font-size: {Typography.TEXT_3XL} !important;
     }}
 
     .stTabs [data-baseweb="tab"] {{
@@ -327,9 +627,8 @@ label, .stMarkdown small, caption {{
         font-size: {Typography.TEXT_SM} !important;
     }}
 
-    .stDataFrame {{
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
+    div[data-testid="column"] > div:hover {{
+        transform: none !important;
     }}
 }}
 
@@ -337,12 +636,71 @@ label, .stMarkdown small, caption {{
     h1 {{ font-size: {Typography.TEXT_2XL} !important; }}
     .stButton button {{ width: 100% !important; }}
     .stMetric {{ min-width: 100% !important; }}
+
+    .stMetric [data-testid="stMetricValue"] {{
+        font-size: {Typography.TEXT_2XL} !important;
+    }}
 }}
 
-@media (min-width: 768px) and (max-width: 1024px) {{
-    .main .block-container {{ max-width: 95% !important; }}
+/* === 🌟 EFECTOS ESPECIALES === */
+/* Scroll suave */
+html {{
+    scroll-behavior: smooth !important;
+}}
+
+/* Selection personalizada */
+::selection {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+}}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {{
+    width: 10px !important;
+    height: 10px !important;
+}}
+
+::-webkit-scrollbar-track {{
+    background: rgba(102, 126, 234, 0.05) !important;
+    border-radius: {BorderRadius.FULL} !important;
+}}
+
+::-webkit-scrollbar-thumb {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    border-radius: {BorderRadius.FULL} !important;
+}}
+
+::-webkit-scrollbar-thumb:hover {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    box-shadow: {Colors.SHADOW_GLOW_PRIMARY} !important;
+}}
+
+/* === 🎨 CLASES UTILITY === */
+.premium-glass {{
+    background: {Colors.GLASS_BG} !important;
+    backdrop-filter: {Colors.GLASS_BACKDROP} !important;
+    border: 1px solid {Colors.GLASS_BORDER} !important;
+    box-shadow: {Colors.GLASS_SHADOW} !important;
+}}
+
+.premium-gradient {{
+    background: {Colors.PREMIUM_GRADIENT_PRIMARY} !important;
+    color: white !important;
+}}
+
+.premium-shadow {{
+    box-shadow: {Colors.SHADOW_PREMIUM_LG} !important;
+}}
+
+.premium-card {{
+    background: {Colors.PREMIUM_CARD_GRADIENT} !important;
+    border-radius: {BorderRadius.LG} !important;
+    padding: {Spacing.XL} !important;
+    box-shadow: {Colors.SHADOW_PREMIUM_MD} !important;
+    border: 1px solid rgba(102, 126, 234, 0.1) !important;
 }}
 </style>
+""", unsafe_allow_html=True)
 """, unsafe_allow_html=True)
 
 # --- Barra lateral de navegación ---
@@ -381,8 +739,8 @@ def mostrar_dashboard():
     año_actual = datetime.date.today().year
 
     with col_selector1:
-        # Calcular índice del año en session_state
-        años_disponibles = list(range(año_actual - 5, año_actual + 1))
+        # Obtener años disponibles desde la BD (años con datos + actual + siguiente)
+        años_disponibles = db_manager.obtener_años_disponibles()
         index_año = años_disponibles.index(st.session_state.año_seleccionado) if st.session_state.año_seleccionado in años_disponibles else len(años_disponibles) - 1
 
         año = st.selectbox("📅 Año", años_disponibles, index=index_año, key="dashboard_año")
@@ -1201,7 +1559,8 @@ def mostrar_transacciones():
     with col1:
         # Usar session_state compartido con Dashboard
         año_actual = datetime.date.today().year
-        años_disponibles = list(range(año_actual - 5, año_actual + 1))
+        # Obtener años disponibles desde la BD (años con datos + actual + siguiente)
+        años_disponibles = db_manager.obtener_años_disponibles()
         index_año = años_disponibles.index(st.session_state.año_seleccionado) if st.session_state.año_seleccionado in años_disponibles else len(años_disponibles) - 1
 
         año = st.selectbox("Año", años_disponibles, index=index_año, key="trans_año")

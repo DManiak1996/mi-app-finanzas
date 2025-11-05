@@ -9,6 +9,17 @@ import plotly.graph_objects as go
 import pandas as pd
 from utils.design_tokens import Colors, Typography
 
+# Colores premium para gráficos (gradientes simulados con colores vibrantes)
+CHART_COLORS_PREMIUM = [
+    Colors.PREMIUM_TEAL_START,      # Verde menta (ingresos)
+    Colors.PREMIUM_CORAL_START,     # Coral (gastos)
+    Colors.PREMIUM_PRIMARY_START,   # Violeta (balance)
+    Colors.PREMIUM_GOLD_START,      # Dorado (extras)
+    Colors.PREMIUM_SKY_START,       # Azul cielo
+    Colors.PREMIUM_TEAL_END,
+    Colors.PREMIUM_CORAL_END,
+]
+
 
 # === CONFIGURACIÓN GLOBAL DE PLOTLY ===
 PLOTLY_TEMPLATE = go.layout.Template(
@@ -20,15 +31,7 @@ PLOTLY_TEMPLATE = go.layout.Template(
         ),
         plot_bgcolor=Colors.BG_PRIMARY,
         paper_bgcolor=Colors.BG_PRIMARY,
-        colorway=[
-            Colors.SUCCESS,          # Verde (ingresos)
-            Colors.ERROR,            # Rojo (gastos)
-            Colors.PRIMARY,          # Azul (balance)
-            Colors.WARNING,          # Naranja
-            Colors.PRIMARY_LIGHT,
-            Colors.SUCCESS_LIGHT,
-            Colors.ERROR_LIGHT,
-        ],
+        colorway=CHART_COLORS_PREMIUM,
         title=dict(
             font=dict(size=18, color=Colors.GRAY_900),
             x=0.5,  # Centrado
@@ -94,10 +97,10 @@ def grafico_distribucion_gastos(gastos_por_categoria):
         hole=0.4,  # Donut más pronunciado
         template=PLOTLY_TEMPLATE,
         color_discrete_sequence=[
-            Colors.ERROR,           # DISFRUTE / Primer sector
-            Colors.PRIMARY,         # FIJOS
-            Colors.WARNING,         # EXTRAORDINARIOS
-            Colors.SUCCESS_DARK,    # COCHE_ELECTRICO
+            Colors.PREMIUM_CORAL_START,    # DISFRUTE / Primer sector
+            Colors.PREMIUM_PRIMARY_START,  # FIJOS
+            Colors.PREMIUM_GOLD_START,     # EXTRAORDINARIOS
+            Colors.PREMIUM_SKY_START,      # COCHE_ELECTRICO
             Colors.PRIMARY_LIGHT,
             Colors.ERROR_LIGHT,
         ]
@@ -149,46 +152,46 @@ def grafico_evolucion_mensual(df_evolucion):
     # Formatear el período para el eje X
     df_evolucion['periodo_str'] = df_evolucion['periodo'].dt.strftime('%Y-%m')
 
-    # Línea de Ingresos (verde)
+    # Línea de Ingresos (verde menta premium)
     fig.add_trace(go.Scatter(
         x=df_evolucion['periodo_str'],
         y=df_evolucion['ingresos'],
         mode='lines+markers',
         name='Ingresos',
-        line=dict(color=Colors.CHART_INCOME, width=3),
+        line=dict(color=Colors.PREMIUM_TEAL_START, width=3),
         marker=dict(
-            size=8,
-            color=Colors.CHART_INCOME,
+            size=10,
+            color=Colors.PREMIUM_TEAL_END,
             line=dict(width=2, color='white')
         ),
         hovertemplate='<b>Ingresos</b><br>%{x}<br>%{y:.2f} €<extra></extra>'
     ))
 
-    # Línea de Gastos Netos (rojo)
+    # Línea de Gastos Netos (coral premium)
     fig.add_trace(go.Scatter(
         x=df_evolucion['periodo_str'],
         y=df_evolucion['gastos_netos'].abs(),  # Valores absolutos
         mode='lines+markers',
         name='Gastos Netos',
-        line=dict(color=Colors.CHART_EXPENSE, width=3),
+        line=dict(color=Colors.PREMIUM_CORAL_START, width=3),
         marker=dict(
-            size=8,
-            color=Colors.CHART_EXPENSE,
+            size=10,
+            color=Colors.PREMIUM_CORAL_END,
             line=dict(width=2, color='white')
         ),
         hovertemplate='<b>Gastos</b><br>%{x}<br>%{y:.2f} €<extra></extra>'
     ))
 
-    # Línea de Balance (azul, punteada)
+    # Línea de Balance (violeta premium, punteada)
     fig.add_trace(go.Scatter(
         x=df_evolucion['periodo_str'],
         y=df_evolucion['balance'],
         mode='lines+markers',
         name='Balance',
-        line=dict(color=Colors.CHART_BALANCE, width=3, dash='dot'),
+        line=dict(color=Colors.PREMIUM_PRIMARY_START, width=3, dash='dot'),
         marker=dict(
-            size=8,
-            color=Colors.CHART_BALANCE,
+            size=10,
+            color=Colors.PREMIUM_PRIMARY_END,
             line=dict(width=2, color='white')
         ),
         hovertemplate='<b>Balance</b><br>%{x}<br>%{y:.2f} €<extra></extra>'

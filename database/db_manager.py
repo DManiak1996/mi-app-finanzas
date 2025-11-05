@@ -972,3 +972,38 @@ def obtener_resumen_presupuestos(mes, año):
     resumen = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return resumen
+
+
+def obtener_años_disponibles():
+    """
+    Obtiene la lista de años disponibles basándose en:
+    1. Años con transacciones registradas en la BD
+    2. Año actual (siempre disponible)
+    3. Año siguiente (para planificación)
+
+    Returns:
+        list: Lista ordenada de años disponibles [2023, 2024, 2025, ...]
+    """
+    import datetime
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Obtener años únicos de las transacciones
+    cursor.execute("""
+        SELECT DISTINCT año
+        FROM transacciones
+        ORDER BY año ASC
+    """)
+
+    años_con_datos = [row['año'] for row in cursor.fetchall()]
+    conn.close()
+
+    # Obtener año actual y siguiente
+    año_actual = datetime.date.today().year
+    año_siguiente = año_actual + 1
+
+    # Combinar y eliminar duplicados
+    años_disponibles = sorted(list(set(años_con_datos + [año_actual, año_siguiente])))
+
+    return años_disponibles
