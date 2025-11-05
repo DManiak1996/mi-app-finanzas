@@ -7,7 +7,7 @@ Incluye SVGs inline para logo, iconos y patterns
 # === LOGO PRINCIPAL ===
 LOGO_SVG = """
 <svg width="180" height="48" viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Gradiente para el icono -->
+    
     <defs>
         <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
@@ -19,13 +19,11 @@ LOGO_SVG = """
         </linearGradient>
     </defs>
 
-    <!-- Icono: Moneda con gráfico ascendente estilizado -->
     <g transform="translate(4, 4)">
-        <!-- Círculo exterior (moneda) -->
+        
         <circle cx="20" cy="20" r="18" fill="url(#logoGradient)" opacity="0.1"/>
         <circle cx="20" cy="20" r="18" stroke="url(#logoGradient)" stroke-width="2.5" fill="none"/>
 
-        <!-- Gráfico ascendente dentro -->
         <path d="M 10 25 L 15 20 L 20 18 L 25 12 L 30 10"
               stroke="url(#logoGradient)"
               stroke-width="2.5"
@@ -33,14 +31,12 @@ LOGO_SVG = """
               stroke-linejoin="round"
               fill="none"/>
 
-        <!-- Puntos de datos -->
         <circle cx="15" cy="20" r="2.5" fill="url(#accentGradient)"/>
         <circle cx="20" cy="18" r="2.5" fill="url(#accentGradient)"/>
         <circle cx="25" cy="12" r="2.5" fill="url(#accentGradient)"/>
         <circle cx="30" cy="10" r="3" fill="url(#accentGradient)"/>
     </g>
 
-    <!-- Texto "FinanzasFlow" -->
     <text x="54" y="20"
           font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
           font-size="18"
