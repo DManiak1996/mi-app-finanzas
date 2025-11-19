@@ -253,8 +253,16 @@ def calcular_estadisticas_mes(recargas: List[Dict]) -> Dict:
     km_totales = sum(r.get('km_recorridos', 0) for r in recargas)
     coste_total = sum(r.get('coste_total', 0) for r in recargas)
 
-    consumo_medio = calcular_consumo_medio(kwh_totales, km_totales)
-    coste_por_km = calcular_coste_por_km(coste_total, km_totales)
+    # Consumo medio: Si hay km registrados, calcular como kWh/km
+    # Si no hay km, usar el promedio de los consumos de cada recarga
+    if km_totales > 0:
+        consumo_medio = calcular_consumo_medio(kwh_totales, km_totales)
+        coste_por_km = calcular_coste_por_km(coste_total, km_totales)
+    else:
+        # Sin km registrados: usar promedio del campo consumo_medio de cada recarga
+        consumos_registrados = [r.get('consumo_medio', 0) for r in recargas if r.get('consumo_medio', 0) > 0]
+        consumo_medio = sum(consumos_registrados) / len(consumos_registrados) if consumos_registrados else 0
+        coste_por_km = 0  # No se puede calcular sin km
 
     # Calcular días promedio entre recargas
     dias_entre_recargas = []

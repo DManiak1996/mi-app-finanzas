@@ -114,7 +114,8 @@ def mostrar_registrar_recarga():
                 "Km recorridos desde última recarga",
                 min_value=0.0,
                 value=0.0,
-                step=1.0
+                step=1.0,
+                help="Distancia recorrida con la batería anterior hasta llegar a esta recarga. Opcional."
             )
 
             consumo_medio = st.number_input(
@@ -462,30 +463,31 @@ def mostrar_registrar_factura_luz():
             )
 
         with col2:
-            st.markdown("#### ⚡ Consumos (kWh)")
+            st.markdown("#### ⚡ Consumos de la RED (kWh)")
+            st.caption("Solo lo que se factura de la red (sin autoconsumo)")
 
             consumo_punta = st.number_input(
-                "Punta",
+                "Punta (de la red)",
                 min_value=0.0,
-                value=110.44,
+                value=106.02,
                 step=0.01,
-                help="kWh consumidos en franja punta"
+                help="kWh consumidos de la RED en franja punta (facturados)"
             )
 
             consumo_llano = st.number_input(
-                "Llano",
+                "Llano (de la red)",
                 min_value=0.0,
-                value=55.80,
+                value=126.82,
                 step=0.01,
-                help="kWh consumidos en franja llano"
+                help="kWh consumidos de la RED en franja llano (facturados)"
             )
 
             consumo_valle = st.number_input(
-                "Valle",
+                "Valle (de la red)",
                 min_value=0.0,
-                value=142.34,
+                value=368.58,
                 step=0.01,
-                help="kWh consumidos en franja valle"
+                help="kWh consumidos de la RED en franja valle (facturados)"
             )
 
         st.markdown("---")
@@ -512,32 +514,42 @@ def mostrar_registrar_factura_luz():
             bono_social = st.number_input(
                 "Bono social",
                 min_value=0.0,
-                value=0.38,
-                step=0.01
+                value=0.40,
+                step=0.01,
+                help="Financiación bono social fijo (cargos normativos)"
             )
 
-            servicios = st.number_input(
-                "Servicios",
+            alquiler = st.number_input(
+                "Alquiler contador",
                 min_value=0.0,
-                value=4.69,
-                step=0.01
+                value=0.83,
+                step=0.01,
+                help="Alquiler de equipos de medida (servicios y otros)"
             )
 
         with col5:
-            excedentes_kwh = st.number_input(
-                "Excedentes (kWh)",
-                min_value=0.0,
+            st.markdown("#### ☀️ Paneles Solares (Smart Solar)")
+
+            energia_generada = st.number_input(
+                "Energía generada (kWh)",
                 value=0.0,
                 step=0.01,
-                help="kWh exportados a la red (paneles solares)"
+                help="kWh generados por los paneles solares durante el periodo"
             )
 
-            excedentes_comp = st.number_input(
-                "Compensación (€)",
-                min_value=0.0,
+            energia_exportada = st.number_input(
+                "Energía exportada (kWh)",
                 value=0.0,
                 step=0.01,
-                help="Euros de compensación por excedentes"
+                help="kWh exportados a la red (excedentes no consumidos)"
+            )
+
+            precio_compensacion = st.number_input(
+                "Precio compensación (€/kWh)",
+                value=0.07,
+                step=0.001,
+                help="Precio que paga Iberdrola por excedentes exportados",
+                format="%.3f"
             )
 
         notas_factura = st.text_area(
@@ -566,9 +578,12 @@ def mostrar_registrar_factura_luz():
                 potencia=potencia,
                 alquiler_contador=alquiler,
                 bono_social=bono_social,
-                servicios=servicios,
-                excedentes_kwh=excedentes_kwh,
-                excedentes_compensacion=excedentes_comp,
+                servicios=0.0,  # Ya no se usa, solo alquiler_contador
+                energia_generada=energia_generada,
+                energia_exportada=energia_exportada,
+                precio_compensacion=precio_compensacion,
+                excedentes_kwh=0,
+                excedentes_compensacion=0,
                 notas=notas_factura
             )
 
@@ -684,13 +699,24 @@ def mostrar_estadisticas_coche():
             st.metric("Recargas", stats_mes['total_recargas'])
             st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}")
             st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
-            st.metric("Coste/km", f"{stats_mes['coste_por_km']:.4f} €")
+
+            # Mostrar coste/km solo si hay km registrados
+            if stats_mes['km_totales'] > 0:
+                st.metric("Coste/km", f"{stats_mes['coste_por_km']:.4f} €")
+            else:
+                st.metric("Coste/km", "N/A", help="Registra km para calcular el coste por kilómetro")
 
         with col2:
-            st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
+            # Mostrar km solo si hay registros de km
+            if stats_mes['km_totales'] > 0:
+                st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
+                st.metric("Km/recarga", f"{stats_mes['km_promedio_por_recarga']:.0f}")
+            else:
+                st.metric("Km Recorridos", "No registrados", help="Opcional: Registra km desde la carga anterior")
+                st.metric("Km/recarga", "N/A")
+
             st.metric("Consumo Medio", f"{stats_mes['consumo_medio']:.1f} kWh/100km")
             st.metric("Días entre recargas", f"{stats_mes['dias_promedio_entre_recargas']:.1f}")
-            st.metric("Km/recarga", f"{stats_mes['km_promedio_por_recarga']:.0f}")
 
         # Comparativa gasolina
         if stats_mes['km_totales'] > 0:
@@ -770,15 +796,30 @@ def mostrar_estadisticas_coche():
         # Tabla resumen por mes
         st.markdown("#### Resumen Mensual")
         df_año['mes_nombre'] = df_año['fecha_recarga'].dt.strftime('%B')
-        resumen_mensual = df_año.groupby('mes_nombre').agg({
+
+        # Agrupar datos por mes
+        resumen_mes = df_año.groupby('mes_nombre').agg({
             'kwh_cargados': 'sum',
             'km_recorridos': 'sum',
-            'coste_total': 'sum',
-            'consumo_medio': 'mean'
+            'coste_total': 'sum'
         }).round(2)
 
-        resumen_mensual.columns = ['kWh Total', 'Km Total', 'Coste Total €', 'Consumo Medio']
-        st.dataframe(resumen_mensual, use_container_width=True)
+        # Calcular consumo medio por mes (si hay km registrados)
+        def calcular_consumo_mes(grupo):
+            km_total = grupo['km_recorridos'].sum()
+            kwh_total = grupo['kwh_cargados'].sum()
+            if km_total > 0:
+                return round((kwh_total / km_total) * 100, 1)
+            else:
+                # Si no hay km, usar promedio de los consumos_medio registrados
+                consumos = grupo['consumo_medio'][grupo['consumo_medio'] > 0]
+                return round(consumos.mean(), 1) if len(consumos) > 0 else 0
+
+        resumen_consumo = df_año.groupby('mes_nombre').apply(calcular_consumo_mes)
+        resumen_mes['consumo_medio'] = resumen_consumo
+
+        resumen_mes.columns = ['kWh Total', 'Km Total', 'Coste Total €', 'Consumo Medio (kWh/100km)']
+        st.dataframe(resumen_mes, use_container_width=True)
 
     else:
         st.info(f"No hay recargas en {año_seleccionado}")

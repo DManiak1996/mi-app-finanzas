@@ -451,11 +451,20 @@ def insertar_factura_electricidad(
     consumo_punta_kwh, consumo_llano_kwh, consumo_valle_kwh,
     tarifa_punta, tarifa_llano, tarifa_valle,
     potencia, alquiler_contador, bono_social, servicios,
+    energia_generada=0, energia_exportada=0, precio_compensacion=0.07,
     excedentes_kwh=0, excedentes_compensacion=0, notas=''
 ):
     """
     Inserta una nueva factura de electricidad en la BD.
-    Calcula automáticamente todos los totales e impuestos.
+    Calcula automáticamente todos los totales e impuestos siguiendo la estructura de Iberdrola:
+
+    ESTRUCTURA:
+    1. ENERGÍA: Coste consumo por franjas + Potencia + Bono social + Compensación excedentes
+    2. CARGOS NORMATIVOS: Impuesto electricidad (5,11%) sobre energía
+    3. SERVICIOS: Alquiler contador
+    4. IMPORTE TOTAL: Suma de energía + cargos + servicios
+    5. IVA: 21% sobre importe total
+    6. TOTAL FACTURA: Importe total + IVA
 
     Returns:
         ID de la factura si tiene éxito, None si falla
@@ -464,41 +473,73 @@ def insertar_factura_electricidad(
     cursor = conn.cursor()
 
     try:
-        # Calcular totales
-        consumo_total_kwh = consumo_punta_kwh + consumo_llano_kwh + consumo_valle_kwh
+        # 1. CONSUMO DE LA RED (ya desagregado por franjas - lo que se factura)
+        consumo_red_kwh = consumo_punta_kwh + consumo_llano_kwh + consumo_valle_kwh
 
-        # Coste energía por franja
-        coste_energia = (
+        # 2. CALCULAR AUTOCONSUMO Y COMPENSACIÓN
+        # Si se proporciona energía_generada y energía_exportada, calcula automáticamente el autoconsumo
+        if energia_generada > 0:
+            energia_autoconsumida = energia_generada - energia_exportada
+            # Calcular compensación real: energía_exportada × precio_compensacion
+            if energia_exportada > 0:
+                excedentes_compensacion = -(energia_exportada * precio_compensacion)
+        else:
+            energia_autoconsumida = 0
+
+        # 3. CONSUMO TOTAL DEL HOGAR (para porcentaje del coche)
+        # Red + Autoconsumo = Total disponible en el hogar
+        consumo_total_kwh = consumo_red_kwh + energia_autoconsumida
+
+        # 4. CALCULAR COSTE DE ENERGÍA POR FRANJA (basado en consumo de RED)
+        # Los consumos ya están desglosados por franja (red)
+        coste_energia_consumo = (
             consumo_punta_kwh * tarifa_punta +
             consumo_llano_kwh * tarifa_llano +
             consumo_valle_kwh * tarifa_valle
         )
 
-        # Subtotal antes de impuestos
-        subtotal = coste_energia + potencia + alquiler_contador + bono_social + servicios
+        # 5. SECCIÓN ENERGÍA (según Iberdrola)
+        # Incluye: coste consumo + potencia + bono social + compensación excedentes
+        energia_consumo = coste_energia_consumo
+        energia_potencia = potencia
+        energia_bono = bono_social
+        energia_compensacion = excedentes_compensacion  # Valor negativo reduce la factura
 
-        # Impuesto electricidad (5,11269632%)
-        impuesto_electricidad = subtotal * 0.0511269632
+        total_energia = energia_consumo + energia_potencia + energia_bono + energia_compensacion
 
-        # Total sin IVA
-        total_sin_iva = subtotal + impuesto_electricidad
+        # 6. CARGOS NORMATIVOS (Impuesto electricidad)
+        # Se aplica sobre el total de energía
+        impuesto_electricidad = total_energia * 0.0511269632
 
-        # IVA (21%)
-        iva = total_sin_iva * 0.21
+        # 7. SERVICIOS Y OTROS (Solo alquiler contador)
+        # En Iberdrola, "SERVICIOS Y OTROS CONCEPTOS" = Alquiler de equipos de medida
+        servicios_total = alquiler_contador
 
-        # Total factura
-        total_factura = total_sin_iva + iva
+        # 8. IMPORTE TOTAL (antes de IVA)
+        importe_total = total_energia + impuesto_electricidad + servicios_total
 
-        # Obtener recargas del mes para calcular participación del coche
+        # 9. IVA (21% sobre importe total)
+        iva = importe_total * 0.21
+
+        # 10. TOTAL FACTURA
+        total_factura = importe_total + iva
+
+        # 11. Obtener recargas del mes para calcular participación del coche
         estadisticas_coche = obtener_estadisticas_recargas_mes(mes, año)
         kwh_coche_mes = estadisticas_coche['kwh_totales']
-        coste_coche_mes = estadisticas_coche['coste_total']
-        porcentaje_coche = (kwh_coche_mes / consumo_total_kwh * 100) if consumo_total_kwh > 0 else 0
+        coste_coche_mes = estadisticas_coche['coste_total']  # Coste REAL de las recargas
+
+        # IMPORTANTE: Porcentaje del coche basado en COSTE REAL, no en kWh teórico
+        # Razón: El coche puede cargar en franjas más baratas (ej: valle)
+        # mientras que la factura incluye franjas más caras (ej: punta)
+        # Por tanto, el coste real del coche es diferente al porcentaje teórico de kWh
+        porcentaje_coche = (coste_coche_mes / total_factura * 100) if total_factura > 0 else 0
 
         # Generar ID
         id_factura = generar_uuid()
 
         # Insertar factura
+        # IMPORTANTE: Guardamos consumo DE LA RED (no el total con autoconsumo)
         cursor.execute("""
             INSERT INTO facturas_electricidad (
                 id, mes, año, fecha_factura,
@@ -512,11 +553,11 @@ def insertar_factura_electricidad(
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             id_factura, mes, año, fecha_factura,
-            consumo_punta_kwh, consumo_llano_kwh, consumo_valle_kwh, consumo_total_kwh,
+            consumo_punta_kwh, consumo_llano_kwh, consumo_valle_kwh, consumo_red_kwh,
             tarifa_punta, tarifa_llano, tarifa_valle,
             potencia, alquiler_contador, bono_social, servicios,
-            coste_energia, impuesto_electricidad, iva, total_factura,
-            excedentes_kwh, excedentes_compensacion,
+            coste_energia_consumo, impuesto_electricidad, iva, total_factura,
+            energia_autoconsumida, excedentes_compensacion,
             kwh_coche_mes, coste_coche_mes, porcentaje_coche,
             notas
         ))
