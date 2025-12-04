@@ -4,11 +4,11 @@
 import sqlite3
 import uuid
 import os
+from datetime import datetime
 from .models import ALL_TABLES
 
 # Obtener la ruta absoluta al directorio database
-DB_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(DB_DIR, 'finanzas.db')
+DB_NAME = "/Users/daniel/Library/Mobile Documents/com~apple~CloudDocs/Finanzas/finanzas.db"
 
 def generar_uuid():
     """Genera un UUID único para usar como ID de transacción."""
@@ -779,13 +779,24 @@ def pagar_recargas_mes(mes, año, fecha_pago, categoria='COCHE_ELECTRICO', notas
         else:
             notas_completas = f"{num_recargas} recargas del mes {mes}/{año}, {total_kwh:.1f} kWh totales"
 
+        # Extraer mes y año de la fecha de pago (no del mes de las recargas)
+        # Esto asegura que la transacción se registre en el mes que realmente se pagó
+        fecha_pago_obj = datetime.strptime(fecha_pago_str, '%Y-%m-%d').date()
+        mes_pago = fecha_pago_obj.month
+        año_pago = fecha_pago_obj.year
+
+        # NO calcular saldo_posterior aquí
+        # Las transacciones manuales se dejan con saldo_posterior = NULL
+        # Luego se puede usar recalcular_saldos_transacciones_manuales() para calcularlos
+        # basándose en el último saldo conocido del banco
+
         cursor.execute("""
             INSERT INTO transacciones (
                 id, fecha, concepto, importe, categoria, tipo, mes, año, notas
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             id_transaccion, fecha_pago_str, concepto, -abs(total_coste),
-            categoria, 'GASTO', mes, año, notas_completas
+            categoria, 'GASTO', mes_pago, año_pago, notas_completas
         ))
 
         # 4. Marcar todas las recargas como pagadas y vincularlas a la transacción
@@ -1048,3 +1059,156 @@ def obtener_años_disponibles():
     años_disponibles = sorted(list(set(años_con_datos + [año_actual, año_siguiente])))
 
     return años_disponibles
+
+def recalcular_saldos_transacciones_manuales(mes=None, año=None):
+    """
+    Calcula el saldo_posterior SOLO para transacciones manuales (sin saldo).
+
+    Algoritmo:
+    1. Para cada transacción manual (sin saldo_posterior)
+    2. Buscar en el mismo mes la transacción del banco más cercana al líquido disponible
+       que sea del mismo día o anterior
+    3. Calcular: saldo_manual = saldo_ancla + suma(trans_manuales_hasta_esta)
+
+    IMPORTANTE: NO modifica transacciones importadas del banco que ya tienen
+    saldo_posterior. El saldo del banco es el saldo REAL y no debe recalcularse.
+
+    Args:
+        mes: Mes a procesar (1-12). Si es None, procesa todos los meses.
+        año: Año a procesar. Si es None, procesa todos los años.
+
+    Returns:
+        int: Número de transacciones manuales actualizadas
+    """
+    from utils import metrics
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Obtener líquido disponible (referencia para encontrar el ancla)
+        liquido_disponible = metrics.calcular_liquido_disponible()
+
+        filtro_msg = ""
+        if mes and año:
+            filtro_msg = f" del mes {mes}/{año}"
+            print(f"🔄 Calculando saldos para transacciones manuales{filtro_msg}...")
+        else:
+            print("🔄 Calculando saldos para TODAS las transacciones manuales...")
+
+        # Obtener transacciones sin saldo_posterior (con filtro opcional)
+        query = """
+            SELECT id, fecha, importe, mes, año
+            FROM transacciones
+            WHERE saldo_posterior IS NULL
+        """
+        params = []
+
+        if mes is not None:
+            query += " AND mes = ?"
+            params.append(mes)
+        if año is not None:
+            query += " AND año = ?"
+            params.append(año)
+
+        query += " ORDER BY fecha ASC, id ASC"
+
+        cursor.execute(query, params)
+        transacciones_sin_saldo = cursor.fetchall()
+
+        if not transacciones_sin_saldo:
+            print(f"✅ No hay transacciones manuales{filtro_msg}")
+            return 0
+
+        print(f"📋 Encontradas {len(transacciones_sin_saldo)} transacciones sin saldo{filtro_msg}")
+        transacciones_actualizadas = 0
+
+        for transaccion in transacciones_sin_saldo:
+            t_id = transaccion['id']
+            t_fecha = transaccion['fecha']
+            t_mes = transaccion['mes']
+            t_año = transaccion['año']
+
+            # Buscar transacción ancla:
+            # - Mismo mes y año
+            # - Fecha <= fecha de la transacción manual
+            # - Saldo más cercano al líquido disponible
+            cursor.execute("""
+                SELECT fecha, saldo_posterior
+                FROM transacciones
+                WHERE saldo_posterior IS NOT NULL
+                  AND mes = ? AND año = ?
+                  AND fecha <= ?
+                ORDER BY ABS(saldo_posterior - ?) ASC
+                LIMIT 1
+            """, (t_mes, t_año, t_fecha, liquido_disponible))
+
+            ancla = cursor.fetchone()
+
+            if ancla:
+                # Calcular suma de transacciones manuales desde el ancla hasta esta
+                cursor.execute("""
+                    SELECT COALESCE(SUM(importe), 0) as suma
+                    FROM transacciones
+                    WHERE saldo_posterior IS NULL
+                      AND fecha >= ?
+                      AND fecha <= ?
+                      AND id <= ?
+                """, (ancla['fecha'], t_fecha, t_id))
+
+                suma_intermedias = cursor.fetchone()['suma']
+                saldo_calculado = ancla['saldo_posterior'] + suma_intermedias
+            else:
+                # No hay ancla: calcular desde el inicio (fallback)
+                cursor.execute("""
+                    SELECT COALESCE(SUM(importe), 0) as suma
+                    FROM transacciones
+                    WHERE fecha < ? OR (fecha = ? AND id <= ?)
+                """, (t_fecha, t_fecha, t_id))
+
+                saldo_calculado = cursor.fetchone()['suma']
+
+            # Actualizar esta transacción
+            cursor.execute("""
+                UPDATE transacciones
+                SET saldo_posterior = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (saldo_calculado, t_id))
+
+            transacciones_actualizadas += 1
+
+        conn.commit()
+        print(f"✅ Calculados {transacciones_actualizadas} saldos{filtro_msg}")
+
+        return transacciones_actualizadas
+
+    except sqlite3.Error as e:
+        print(f"❌ Error al calcular saldos: {e}")
+        conn.rollback()
+        return 0
+    finally:
+        conn.close()
+
+def calcular_saldo_actual():
+    """
+    Calcula el saldo actual basándose en todas las transacciones.
+
+    Returns:
+        float: Saldo actual (suma de todos los importes)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT COALESCE(SUM(importe), 0) as saldo_total
+            FROM transacciones
+        """)
+
+        resultado = cursor.fetchone()
+        saldo_actual = resultado['saldo_total'] if resultado else 0
+
+        return saldo_actual
+
+    finally:
+        conn.close()
