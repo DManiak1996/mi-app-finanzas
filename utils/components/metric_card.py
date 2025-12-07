@@ -127,10 +127,16 @@ def render_metric_card(
     shadow_md_clean = ' '.join(Colors.SHADOW_PREMIUM_MD.split())
     shadow_lg_clean = ' '.join(Colors.SHADOW_PREMIUM_LG.split())
 
-    # HTML de la tarjeta (sin event handlers - usar CSS puro)
-    card_html = f"""
+    # Generar ID único para esta card
+    card_id = f"metric-card-{color}-{abs(hash(str(value) + title))}"
+
+    # Preparar backdrop_filter para CSS (sin punto y coma final)
+    backdrop_css = f"backdrop-filter: {Colors.GLASS_BACKDROP};" if glassmorphism else ""
+
+    # Inyectar CSS global primero (separado del HTML)
+    css_rules = f"""
     <style>
-        .metric-card-{color}-{id(value)} {{
+        .{card_id} {{
             background: {card_background};
             border-radius: {BorderRadius.LG};
             border: 2px solid {config['border_color']};
@@ -139,15 +145,20 @@ def render_metric_card(
             transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT};
             position: relative;
             overflow: hidden;
-            {backdrop_filter}
+            {backdrop_css}
             cursor: default;
         }}
-        .metric-card-{color}-{id(value)}:hover {{
+        .{card_id}:hover {{
             transform: translateY(-2px);
             box-shadow: {shadow_lg_clean};
         }}
     </style>
-    <div class="metric-card metric-card-{color}-{id(value)}">
+    """
+    st.markdown(css_rules, unsafe_allow_html=True)
+
+    # HTML de la tarjeta (sin <style> inline)
+    card_html = f"""
+    <div class="{card_id}">
 
         {f'''<!-- Barra decorativa superior -->
         <div style="
