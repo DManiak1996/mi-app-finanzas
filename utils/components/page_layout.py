@@ -570,12 +570,16 @@ def page_breadcrumbs(items: List[Dict[str, str]]) -> None:
         # Item (link o texto)
         if url:
             breadcrumb_html += f"""
-            <a href="{url}" style="
+            <style>
+                .breadcrumb-link-{i}:hover {{
+                    color: {Colors.PRIMARY_LIGHT} !important;
+                }}
+            </style>
+            <a href="{url}" class="breadcrumb-link-{i}" style="
                 color: {Colors.PRIMARY};
                 text-decoration: none;
                 transition: color {Transitions.FAST} {Transitions.EASING_DEFAULT};
-            " onmouseover="this.style.color='{Colors.PRIMARY_LIGHT}'"
-               onmouseout="this.style.color='{Colors.PRIMARY}'">
+            ">
                 {label}
             </a>
             """
@@ -773,18 +777,22 @@ def page_footer(
             flex-wrap: wrap;
         ">
         """
-        for link in links:
+        for idx, link in enumerate(links):
             label = link.get("label", "")
             url = link.get("url", "#")
             footer_html += f"""
-            <a href="{url}" style="
+            <style>
+                .footer-link-{idx}:hover {{
+                    color: {Colors.PRIMARY_LIGHT} !important;
+                }}
+            </style>
+            <a href="{url}" class="footer-link-{idx}" style="
                 color: {Colors.PRIMARY};
                 text-decoration: none;
                 font-size: {Typography.TEXT_SM};
                 font-weight: {Typography.WEIGHT_MEDIUM};
                 transition: color {Transitions.FAST} {Transitions.EASING_DEFAULT};
-            " onmouseover="this.style.color='{Colors.PRIMARY_LIGHT}'"
-               onmouseout="this.style.color='{Colors.PRIMARY}'">
+            ">
                 {label}
             </a>
             """

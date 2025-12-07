@@ -127,21 +127,27 @@ def render_metric_card(
     shadow_md_clean = ' '.join(Colors.SHADOW_PREMIUM_MD.split())
     shadow_lg_clean = ' '.join(Colors.SHADOW_PREMIUM_LG.split())
 
-    # HTML de la tarjeta
+    # HTML de la tarjeta (sin event handlers - usar CSS puro)
     card_html = f"""
-    <div class="metric-card metric-card-{color}" style="
-        background: {card_background};
-        border-radius: {BorderRadius.LG};
-        border: 2px solid {config['border_color']};
-        padding: {Spacing.LG} {Spacing.XL};
-        box-shadow: {shadow_md_clean};
-        transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT};
-        position: relative;
-        overflow: hidden;
-        {backdrop_filter}
-        cursor: default;
-    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='{shadow_lg_clean}';"
-       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='{shadow_md_clean}';">
+    <style>
+        .metric-card-{color}-{id(value)} {{
+            background: {card_background};
+            border-radius: {BorderRadius.LG};
+            border: 2px solid {config['border_color']};
+            padding: {Spacing.LG} {Spacing.XL};
+            box-shadow: {shadow_md_clean};
+            transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT};
+            position: relative;
+            overflow: hidden;
+            {backdrop_filter}
+            cursor: default;
+        }}
+        .metric-card-{color}-{id(value)}:hover {{
+            transform: translateY(-2px);
+            box-shadow: {shadow_lg_clean};
+        }}
+    </style>
+    <div class="metric-card metric-card-{color}-{id(value)}">
 
         {f'''<!-- Barra decorativa superior -->
         <div style="
