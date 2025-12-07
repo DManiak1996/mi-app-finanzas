@@ -1,15 +1,17 @@
 """
-Componente MetricCard - Tarjetas de métricas premium reutilizables
-================================================================
+Componente MetricCard - Tarjetas de métricas usando componentes nativos de Streamlit
+===================================================================================
 
 Este módulo proporciona componentes para mostrar métricas financieras
-con un diseño premium consistente que incluye:
-- Glassmorphism y gradientes
-- Indicadores de tendencia
-- Deltas con formato automático
-- Iconos personalizables
-- Responsive design
-- Integración con design_tokens.py
+usando SOLO componentes nativos de Streamlit (st.metric):
+- Formateo automático (currency, percent, number, text)
+- Indicadores de tendencia (delta con colores)
+- Iconos personalizables en el título
+- Integración con design_tokens.py para formateo
+
+NOTA: Esta versión usa st.metric() nativo en lugar de HTML custom.
+Los parámetros 'color', 'show_border' y 'glassmorphism' se mantienen
+para compatibilidad con código existente pero se ignoran en el render.
 
 Uso básico:
     from utils.components.metric_card import render_metric_card
@@ -24,8 +26,8 @@ Uso básico:
     )
 
 Author: Daniel
-Version: 1.0
-Date: 2025-12-04
+Version: 2.0 (Native Components)
+Date: 2025-12-07
 """
 
 import streamlit as st
@@ -53,7 +55,7 @@ def render_metric_card(
     glassmorphism: bool = False
 ) -> None:
     """
-    Renderiza una tarjeta de métrica con diseño premium.
+    Renderiza una tarjeta de métrica usando componentes nativos de Streamlit.
 
     Args:
         title: Título de la métrica (ej: "Balance del Mes")
@@ -64,8 +66,8 @@ def render_metric_card(
         trend: Indicador de tendencia visual ("up", "down", "neutral")
         format_type: Tipo de formato automático ("currency", "percent", "number", "text")
         help_text: Texto de ayuda mostrado como caption
-        show_border: Mostrar borde decorativo superior
-        glassmorphism: Aplicar efecto glassmorphism
+        show_border: Mostrar borde decorativo superior (ignorado en versión nativa)
+        glassmorphism: Aplicar efecto glassmorphism (ignorado en versión nativa)
 
     Returns:
         None: Renderiza directamente en Streamlit
@@ -108,136 +110,33 @@ def render_metric_card(
 
     # Formatear delta si existe
     formatted_delta = None
-    delta_icon = ""
-    delta_color_text = Colors.GRAY_700
+    delta_color = "normal"  # Streamlit usa "normal", "inverse", "off"
 
     if delta is not None:
         formatted_delta, delta_icon, delta_color_text = _format_delta(
             delta, format_type, trend
         )
 
-    # Obtener configuración de colores según variante
-    config = _get_color_config(color)
+        # Determinar delta_color para st.metric
+        # Si trend está especificado, usarlo; si no, basarse en el signo
+        if trend == "up" or (trend is None and isinstance(delta, (int, float)) and delta > 0):
+            delta_color = "normal"  # Verde para positivo
+        elif trend == "down" or (trend is None and isinstance(delta, (int, float)) and delta < 0):
+            delta_color = "inverse"  # Rojo para negativo
+        else:
+            delta_color = "off"  # Sin color para neutral
 
-    # Aplicar glassmorphism si se solicita
-    card_background = Colors.GLASS_BG if glassmorphism else Colors.PREMIUM_CARD_GRADIENT
-    backdrop_filter = f"backdrop-filter: {Colors.GLASS_BACKDROP};" if glassmorphism else ""
+    # Agregar icono al título si existe
+    label_with_icon = f"{icon} {title}" if icon else title
 
-    # Limpiar sombras (eliminar saltos de línea y espacios extras para usar en atributos HTML)
-    shadow_md_clean = ' '.join(Colors.SHADOW_PREMIUM_MD.split())
-    shadow_lg_clean = ' '.join(Colors.SHADOW_PREMIUM_LG.split())
-
-    # Generar ID único para esta card
-    card_id = f"metric-card-{color}-{abs(hash(str(value) + title))}"
-
-    # Preparar backdrop_filter para CSS (sin punto y coma final)
-    backdrop_css = f"backdrop-filter: {Colors.GLASS_BACKDROP};" if glassmorphism else ""
-
-    # Inyectar CSS global primero (separado del HTML)
-    css_rules = f"""
-    <style>
-        .{card_id} {{
-            background: {card_background};
-            border-radius: {BorderRadius.LG};
-            border: 2px solid {config['border_color']};
-            padding: {Spacing.LG} {Spacing.XL};
-            box-shadow: {shadow_md_clean};
-            transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT};
-            position: relative;
-            overflow: hidden;
-            {backdrop_css}
-            cursor: default;
-        }}
-        .{card_id}:hover {{
-            transform: translateY(-2px);
-            box-shadow: {shadow_lg_clean};
-        }}
-    </style>
-    """
-    st.markdown(css_rules, unsafe_allow_html=True)
-
-    # HTML de la tarjeta (sin <style> inline)
-    card_html = f"""
-    <div class="{card_id}">
-
-        {f'''<!-- Barra decorativa superior -->
-        <div style="
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: {config['gradient']};
-        "></div>''' if show_border else ''}
-
-        <!-- Contenedor del header -->
-        <div style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: {Spacing.MD};
-        ">
-            <!-- Label con icono -->
-            <div style="
-                display: flex;
-                align-items: center;
-                gap: {Spacing.SM};
-            ">
-                {f'<span style="font-size: {Typography.TEXT_XL}; line-height: 1;">{icon}</span>' if icon else ''}
-                <span style="
-                    font-size: {Typography.TEXT_SM};
-                    font-weight: {Typography.WEIGHT_SEMIBOLD};
-                    text-transform: uppercase;
-                    letter-spacing: {Typography.TRACKING_WIDE};
-                    color: {Colors.GRAY_700};
-                ">{title}</span>
-            </div>
-
-            {f'''<!-- Indicador de tendencia -->
-            <span style="
-                font-size: {Typography.TEXT_2XL};
-                line-height: 1;
-                opacity: 0.6;
-            ">{_get_trend_arrow(trend)}</span>''' if trend else ''}
-        </div>
-
-        <!-- Valor principal -->
-        <div style="
-            font-size: {Typography.TEXT_4XL};
-            font-weight: {Typography.WEIGHT_EXTRABOLD};
-            line-height: {Typography.LEADING_NONE};
-            background: {config['gradient']};
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: {Spacing.SM};
-            font-family: {Typography.FONT_PRIMARY};
-        ">{formatted_value}</div>
-
-        {f'''<!-- Delta con tendencia -->
-        <div style="
-            display: inline-flex;
-            align-items: center;
-            gap: {Spacing.XS};
-            padding: {Spacing.XS} {Spacing.MD};
-            border-radius: {BorderRadius.FULL};
-            background: {rgba_from_hex(config['base_color'], 0.1)};
-            font-size: {Typography.TEXT_SM};
-            font-weight: {Typography.WEIGHT_MEDIUM};
-            color: {delta_color_text};
-        ">
-            <span style="font-size: {Typography.TEXT_BASE}; line-height: 1;">{delta_icon}</span>
-            <span>{formatted_delta}</span>
-        </div>''' if formatted_delta else ''}
-    </div>
-    """
-
-    # Renderizar en Streamlit
-    st.markdown(card_html, unsafe_allow_html=True)
-
-    # Mostrar help text si existe
-    if help_text:
-        st.caption(f"💡 {help_text}")
+    # Usar st.metric nativo de Streamlit
+    st.metric(
+        label=label_with_icon,
+        value=formatted_value,
+        delta=formatted_delta if delta is not None else None,
+        delta_color=delta_color,
+        help=help_text
+    )
 
 
 def metric_card_success(
@@ -625,18 +524,18 @@ def render_metric_grid(
     columns_mobile: int = 1
 ) -> None:
     """
-    Renderiza métricas en un grid responsive (simplificado para Streamlit).
+    Renderiza métricas en un grid usando st.columns nativo.
 
     Args:
         metrics: Lista de diccionarios con parámetros para render_metric_card
         columns_desktop: Número de columnas en desktop (usado por defecto)
-        columns_tablet: Número de columnas en tablet (no soportado en Streamlit)
-        columns_mobile: Número de columnas en móvil (no soportado en Streamlit)
+        columns_tablet: Número de columnas en tablet (ignorado en versión nativa)
+        columns_mobile: Número de columnas en móvil (ignorado en versión nativa)
 
     Note:
-        Streamlit no soporta media queries CSS, por lo que solo se usa columns_desktop.
-        Para responsive real, considerar usar st.columns con diferentes layouts
-        según el tamaño de pantalla detectado con JavaScript.
+        Esta versión usa componentes nativos de Streamlit.
+        Los parámetros columns_tablet y columns_mobile se ignoran ya que
+        Streamlit no soporta media queries CSS directamente.
 
     Example:
         >>> render_metric_grid([
@@ -656,7 +555,8 @@ def render_metric_grid(
 
     # Renderizar cada fila
     for row in rows:
-        cols = st.columns(num_cols)
+        # Crear columnas para esta fila (usar len(row) para manejar última fila incompleta)
+        cols = st.columns(len(row))
         for idx, metric_config in enumerate(row):
             with cols[idx]:
                 render_metric_card(**metric_config)
