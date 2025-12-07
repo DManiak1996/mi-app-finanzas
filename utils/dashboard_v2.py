@@ -76,13 +76,10 @@ def mostrar_dashboard_v2(NOMBRES_MESES, MESES_INVERTIDO, mostrar_desglose_ingres
 
         with col_selector3:
             liquido_disponible = metrics.calcular_liquido_disponible()
-            render_metric_card(
-                title="Líquido Disponible Total",
-                value=liquido_disponible,
-                icon="💧",
-                color="info",
-                format_type="currency",
-                help_text="Balance acumulado de todas tus transacciones"
+            st.metric(
+                label="💧 Líquido Disponible Total",
+                value=f"{liquido_disponible:.2f} €",
+                help="Balance acumulado de todas tus transacciones"
             )
 
         with col_selector4:

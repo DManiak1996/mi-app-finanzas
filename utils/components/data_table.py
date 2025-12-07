@@ -264,7 +264,7 @@ def render_data_table(
     search_placeholder: str = "Buscar...",
     pagination: bool = False,
     page_size: int = 20,
-    height: int = None,
+    height: Optional[int] = None,
     use_container_width: bool = True,
     hide_index: bool = True,
     key: str = None,
@@ -439,14 +439,21 @@ def render_data_table(
                 st_column_config[col_name] = col_cfg
 
     # === RENDERIZAR TABLA ===
-    st.dataframe(
-        display_df,
-        column_config=st_column_config,
-        height=height,
-        use_container_width=use_container_width,
-        hide_index=hide_index,
-        key=f"{key}_dataframe" if key else None
-    )
+    # Construir kwargs dinámicamente para evitar pasar height=None que puede causar error en algunas versiones de Streamlit
+    dataframe_kwargs = {
+        "data": display_df,
+        "column_config": st_column_config,
+        "use_container_width": use_container_width,
+        "hide_index": hide_index,
+    }
+
+    if height is not None:
+        dataframe_kwargs["height"] = height
+
+    if key:
+        dataframe_kwargs["key"] = f"{key}_dataframe"
+
+    st.dataframe(**dataframe_kwargs)
 
     return display_df
 

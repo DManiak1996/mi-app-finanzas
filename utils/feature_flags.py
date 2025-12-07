@@ -44,7 +44,7 @@ class FeatureFlags:
     # ==========================================
     # FASE 0: MASTER FLAG
     # ==========================================
-    USE_NEW_DESIGN = True  # ✅ ACTIVADO - Overhaul completo implementado
+    USE_NEW_DESIGN = True  # ✅ ACTIVADO - Bugs corregidos: gap parameter + HTML rendering
     """
     Master flag: Si es True, activa automáticamente todos los flags.
     Útil para activar el diseño completo de una vez en producción.
@@ -53,19 +53,19 @@ class FeatureFlags:
     # ==========================================
     # FASE 1: DESIGN SYSTEM (Fundamentos)
     # ==========================================
-    USE_NEW_COMPONENTS = True  # ✅ ACTIVADO
+    USE_NEW_COMPONENTS = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa los componentes wrapper del nuevo design system.
     No afecta la UI visualmente, solo reorganiza el código.
     """
 
-    USE_NEW_CSS_MODULE = True  # ✅ ACTIVADO
+    USE_NEW_CSS_MODULE = False  # ⚠️ DESACTIVADO temporalmente
     """
     Usa el CSS extraído del app.py al módulo separado.
     Permite mantener estilos centralizados y consistentes.
     """
 
-    USE_NEW_PLOTLY_THEME = True  # ✅ ACTIVADO
+    USE_NEW_PLOTLY_THEME = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa el tema unificado de Plotly para todos los gráficos.
     Incluye colores, tipografía y estilos consistentes.
@@ -74,31 +74,31 @@ class FeatureFlags:
     # ==========================================
     # FASE 2: COMPONENTES (UI Aislada)
     # ==========================================
-    USE_METRIC_CARDS = True  # ✅ ACTIVADO
+    USE_METRIC_CARDS = False  # ⚠️ DESACTIVADO temporalmente
     """
     Usa el componente MetricCard para métricas del dashboard.
     Reemplaza st.metric() con versión estilizada.
     """
 
-    USE_CHART_TEMPLATES = True  # ✅ ACTIVADO
+    USE_CHART_TEMPLATES = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa plantillas de gráficos predefinidas.
     Estandariza la creación de gráficos en toda la app.
     """
 
-    USE_LAYOUT_SYSTEM = True  # ✅ ACTIVADO
+    USE_LAYOUT_SYSTEM = False  # ⚠️ DESACTIVADO temporalmente
     """
     Usa el sistema de layouts (Grid, Container, etc).
     Mejora la organización espacial de la UI.
     """
 
-    USE_FORM_CARDS = True  # ✅ ACTIVADO
+    USE_FORM_CARDS = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa el componente FormCard para formularios.
     Estandariza la apariencia de formularios.
     """
 
-    USE_DATA_TABLES = True  # ✅ ACTIVADO
+    USE_DATA_TABLES = False  # ⚠️ DESACTIVADO temporalmente
     """
     Usa el componente DataTable para tablas de datos.
     Mejora la presentación de datos tabulares.
@@ -107,44 +107,44 @@ class FeatureFlags:
     # ==========================================
     # FASE 3: PAGES (Rediseño por página)
     # ==========================================
-    USE_NEW_DASHBOARD = True  # ✅ ACTIVADO
+    USE_NEW_DASHBOARD = False  # ⚠️ DESACTIVADO - render_metric_grid no funciona correctamente
     """
     Activa el dashboard rediseñado (v2).
     Incluye nuevo layout, métricas y gráficos.
     ESTADO: ACTIVO - Dashboard migrado al nuevo sistema de diseño
     """
 
-    USE_NEW_TRANSACCIONES = True  # ✅ ACTIVADO
+    USE_NEW_TRANSACCIONES = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de transacciones rediseñada (v2).
     Mejora filtros, tabla y visualización.
     """
 
-    USE_NEW_IMPORTAR = True  # ✅ ACTIVADO
+    USE_NEW_IMPORTAR = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de importación rediseñada (v2).
     Mejora el flujo de importación de archivos.
     """
 
-    USE_NEW_CATEGORIAS = True  # ✅ ACTIVADO
+    USE_NEW_CATEGORIAS = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de categorías rediseñada (v2).
     Mejora la gestión de categorías.
     """
 
-    USE_NEW_CONFIGURACION = True  # ✅ ACTIVADO
+    USE_NEW_CONFIGURACION = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de configuración rediseñada (v2).
     Mejora la organización de ajustes.
     """
 
-    USE_NEW_COCHE_ELECTRICO = True  # ✅ ACTIVADO
+    USE_NEW_COCHE_ELECTRICO = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de coche eléctrico rediseñada (v2).
     Mejora tracking de cargas y estadísticas.
     """
 
-    USE_NEW_ASISTENTE_IA = True  # ✅ ACTIVADO
+    USE_NEW_ASISTENTE_IA = False  # ⚠️ DESACTIVADO temporalmente
     """
     Activa la página de asistente IA rediseñada (v2).
     Mejora la interfaz de chat y sugerencias.

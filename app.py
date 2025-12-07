@@ -1475,7 +1475,7 @@ def mostrar_transacciones_v2():
                     importe = st.number_input(
                         "Importe (€)",
                         min_value=0.01,
-                        value=0.00,
+                        value=0.01,
                         step=0.01,
                         format="%.2f",
                         key="nueva_trans_importe"

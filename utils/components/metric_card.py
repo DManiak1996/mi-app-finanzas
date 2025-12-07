@@ -123,6 +123,10 @@ def render_metric_card(
     card_background = Colors.GLASS_BG if glassmorphism else Colors.PREMIUM_CARD_GRADIENT
     backdrop_filter = f"backdrop-filter: {Colors.GLASS_BACKDROP};" if glassmorphism else ""
 
+    # Limpiar sombras (eliminar saltos de línea y espacios extras para usar en atributos HTML)
+    shadow_md_clean = ' '.join(Colors.SHADOW_PREMIUM_MD.split())
+    shadow_lg_clean = ' '.join(Colors.SHADOW_PREMIUM_LG.split())
+
     # HTML de la tarjeta
     card_html = f"""
     <div class="metric-card metric-card-{color}" style="
@@ -130,14 +134,14 @@ def render_metric_card(
         border-radius: {BorderRadius.LG};
         border: 2px solid {config['border_color']};
         padding: {Spacing.LG} {Spacing.XL};
-        box-shadow: {Colors.SHADOW_PREMIUM_MD};
+        box-shadow: {shadow_md_clean};
         transition: all {Transitions.BASE} {Transitions.EASING_DEFAULT};
         position: relative;
         overflow: hidden;
         {backdrop_filter}
         cursor: default;
-    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='{Colors.SHADOW_PREMIUM_LG}';"
-       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='{Colors.SHADOW_PREMIUM_MD}';">
+    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='{shadow_lg_clean}';"
+       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='{shadow_md_clean}';">
 
         {f'''<!-- Barra decorativa superior -->
         <div style="

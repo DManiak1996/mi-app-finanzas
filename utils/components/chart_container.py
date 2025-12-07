@@ -32,6 +32,51 @@ from utils.plotly_theme import apply_theme_to_fig
 from utils.feature_flags import is_enabled
 
 
+# ========== HELPER FUNCTIONS ==========
+
+def map_spacing_to_gap(spacing: str) -> str:
+    """
+    Map design token spacing values to Streamlit's gap parameter.
+
+    Streamlit only accepts: "small", "medium", "large", or "none"
+    This function converts any spacing token to a valid gap value.
+
+    Args:
+        spacing: Design token spacing value (e.g., Spacing.LG, "1.5rem", etc.)
+
+    Returns:
+        Valid Streamlit gap value ("small", "medium", "large", or "none")
+
+    Example:
+        >>> map_spacing_to_gap(Spacing.LG)  # "1.5rem"
+        'large'
+        >>> map_spacing_to_gap("medium")
+        'medium'
+    """
+    # If already a valid Streamlit gap value, return as is
+    if spacing in ["small", "medium", "large", "none"]:
+        return spacing
+
+    # Map rem values to closest Streamlit gap
+    # Check for specific patterns in order (most specific first)
+
+    # Small: Values less than 0.75rem
+    if "0.5" in spacing or "0.25" in spacing or "0.125" in spacing:
+        return "small"
+    # Medium: 0.75rem - 1rem
+    elif "0.75" in spacing or spacing == "1rem":
+        return "medium"
+    # Large: 1.5rem and above
+    elif "1.5" in spacing or "2" in spacing or "3" in spacing or "4" in spacing or "6" in spacing:
+        return "large"
+    # Catch remaining "1" patterns (like "1rem") as medium
+    elif "1" in spacing:
+        return "medium"
+
+    # Default to medium for unknown values
+    return "medium"
+
+
 # ========== COMPONENTE PRINCIPAL ==========
 
 def render_chart_container(
@@ -188,7 +233,7 @@ def render_chart_half(
     Args:
         figures: Lista de diccionarios con configuración de gráficas
                  [{"fig": fig1, "title": "...", ...}, {"fig": fig2, ...}]
-        gap: Espacio entre columnas
+        gap: Espacio entre columnas (will be mapped to Streamlit gap value)
 
     Example:
         >>> render_chart_half([
@@ -200,7 +245,9 @@ def render_chart_half(
         st.error("render_chart_half requiere exactamente 2 gráficas")
         return
 
-    cols = st.columns(2, gap=gap)
+    # Map spacing token to valid Streamlit gap value
+    streamlit_gap = map_spacing_to_gap(gap)
+    cols = st.columns(2, gap=streamlit_gap)
 
     for col, chart_config in zip(cols, figures):
         with col:
@@ -541,7 +588,7 @@ def create_chart_grid(
     Args:
         charts: Lista de diccionarios con configuración de gráficas
         columns: Número de columnas
-        gap: Espacio entre gráficas
+        gap: Espacio entre gráficas (will be mapped to Streamlit gap value)
 
     Example:
         >>> create_chart_grid([
@@ -551,7 +598,9 @@ def create_chart_grid(
         ...     {"fig": fig4, "title": "Chart 4"}
         ... ], columns=2)
     """
-    cols = st.columns(columns, gap=gap)
+    # Map spacing token to valid Streamlit gap value
+    streamlit_gap = map_spacing_to_gap(gap)
+    cols = st.columns(columns, gap=streamlit_gap)
 
     for i, chart_config in enumerate(charts):
         col_idx = i % columns
