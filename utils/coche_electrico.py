@@ -226,12 +226,18 @@ def calcular_consumo_medio(kwh_totales: float, km_totales: float) -> float:
 
 # ========== FUNCIONES DE ESTADÍSTICAS MENSUALES ==========
 
-def calcular_estadisticas_mes(recargas: List[Dict]) -> Dict:
+def calcular_estadisticas_mes(
+    recargas: List[Dict],
+    incluir_proyeccion: bool = False,
+    detectar_anomalias: bool = False
+) -> Dict:
     """
     Calcula estadísticas completas de un mes basándose en todas las recargas.
 
     Args:
         recargas: Lista de diccionarios con datos de recargas del mes
+        incluir_proyeccion: Si True, calcula proyecciones a fin de mes
+        detectar_anomalias: Si True, busca recargas con km/día atípicos
 
     Returns:
         Dict con todas las estadísticas del mes
@@ -294,6 +300,16 @@ def calcular_estadisticas_mes(recargas: List[Dict]) -> Dict:
         for franja, count in recargas_por_franja.items()
     }
 
+    # Proyecciones y Anomalías
+    proyeccion = {}
+    anomalias = []
+    
+    if incluir_proyeccion:
+        proyeccion = calcular_proyeccion_mes(recargas)
+        
+    if detectar_anomalias:
+        anomalias = detectar_anomalias_km(recargas)
+
     return {
         'total_recargas': total_recargas,
         'kwh_totales': round(kwh_totales, 2),
@@ -303,7 +319,9 @@ def calcular_estadisticas_mes(recargas: List[Dict]) -> Dict:
         'coste_por_km': coste_por_km,
         'dias_promedio_entre_recargas': round(dias_promedio, 1),
         'km_promedio_por_recarga': round(km_promedio_recarga, 1),
-        'distribucion_franjas': porcentajes_franja
+        'distribucion_franjas': porcentajes_franja,
+        'proyeccion': proyeccion,
+        'anomalias': anomalias
     }
 
 
@@ -356,3 +374,133 @@ def validar_franja_horaria(franja: str) -> bool:
 def validar_potencia_recarga(potencia: float) -> bool:
     """Valida que la potencia de recarga sea razonable (entre 1 y 350 kW)."""
     return 1 <= potencia <= 350
+
+# ========== FUNCIONES DE PROYECCIÓN Y ANOMALÍAS ==========
+
+def calcular_proyeccion_mes(recargas: List[Dict], fecha_actual: datetime.date = None) -> Dict:
+    """
+    Calcula proyecciones para fin de mes basadas en el ritmo actual.
+    
+    Args:
+        recargas: Lista de recargas del mes
+        fecha_actual: Fecha de referencia (por defecto hoy)
+        
+    Returns:
+        Dict con valores proyectados
+    """
+    if not fecha_actual:
+        fecha_actual = datetime.date.today()
+        
+    # Datos básicos del mes
+    dias_totales_mes = (fecha_actual.replace(month=fecha_actual.month % 12 + 1, day=1) - datetime.timedelta(days=1)).day
+    dias_transcurridos = fecha_actual.day
+    dias_restantes = dias_totales_mes - dias_transcurridos
+    
+    # Totales actuales
+    kwh_actuales = sum(r.get('kwh_cargados', 0) for r in recargas)
+    coste_actual = sum(r.get('coste_total', 0) for r in recargas)
+    km_actuales = sum(r.get('km_recorridos', 0) for r in recargas)
+    
+    # Calcular promedio km/día (solo de recargas con km > 0)
+    recargas_con_km = [r for r in recargas if r.get('km_recorridos', 0) > 0]
+    
+    # Necesitamos saber cuántos días cubren esas recargas
+    # Simplificación: usamos días transcurridos si hay al menos una recarga con km
+    if recargas_con_km and dias_transcurridos > 0:
+        km_promedio_dia = km_actuales / dias_transcurridos
+    else:
+        km_promedio_dia = 0
+        
+    # Proyecciones
+    km_proyectados = km_actuales + (km_promedio_dia * dias_restantes)
+    
+    # Proyección proporcional para kWh y Coste (asumiendo consumo constante)
+    if dias_transcurridos > 0:
+        factor_proyeccion = dias_totales_mes / dias_transcurridos
+        kwh_proyectados = kwh_actuales * factor_proyeccion
+        coste_proyectado = coste_actual * factor_proyeccion
+    else:
+        kwh_proyectados = 0
+        coste_proyectado = 0
+        
+    return {
+        'dias_transcurridos': dias_transcurridos,
+        'dias_totales': dias_totales_mes,
+        'km_promedio_dia': round(km_promedio_dia, 1),
+        'km_proyectados': round(km_proyectados, 0),
+        'kwh_proyectados': round(kwh_proyectados, 1),
+        'coste_proyectado': round(coste_proyectado, 2)
+    }
+
+def detectar_anomalias_km(recargas: List[Dict], umbral_desviacion: float = 0.5) -> List[Dict]:
+    """
+    Detecta recargas con km/día que se desvían significativamente del promedio.
+    
+    Args:
+        recargas: Lista de recargas
+        umbral_desviacion: Porcentaje de desviación para considerar anomalía (0.5 = 50%)
+        
+    Returns:
+        Lista de anomalías detectadas
+    """
+    recargas_con_km = [r for r in recargas if r.get('km_recorridos', 0) > 0]
+    if not recargas_con_km:
+        return []
+        
+    # Calcular km/día para cada recarga
+    # Necesitamos la fecha de la recarga anterior para saber los días
+    recargas_ordenadas = sorted(recargas_con_km, key=lambda x: x.get('fecha_recarga'))
+    datos_analisis = []
+    
+    # Obtener todas las recargas (incluso sin km) para calcular días correctamente
+    todas_recargas = sorted(recargas, key=lambda x: x.get('fecha_recarga'))
+    
+    for i, recarga in enumerate(todas_recargas):
+        if recarga.get('km_recorridos', 0) <= 0:
+            continue
+            
+        # Buscar fecha anterior
+        if i > 0:
+            fecha_anterior = todas_recargas[i-1].get('fecha_recarga')
+            if isinstance(fecha_anterior, str):
+                fecha_anterior = datetime.datetime.fromisoformat(fecha_anterior)
+        else:
+            # Si es la primera del mes, no podemos calcular días exactos sin consultar mes anterior
+            # Omitimos esta para el análisis de anomalías intra-mes
+            continue
+            
+        fecha_actual = recarga.get('fecha_recarga')
+        if isinstance(fecha_actual, str):
+            fecha_actual = datetime.datetime.fromisoformat(fecha_actual)
+            
+        dias = (fecha_actual - fecha_anterior).days
+        if dias > 0:
+            km_dia = recarga['km_recorridos'] / dias
+            datos_analisis.append({
+                'recarga': recarga,
+                'km_dia': km_dia,
+                'dias': dias,
+                'fecha': fecha_actual.strftime('%d/%m')
+            })
+            
+    if not datos_analisis:
+        return []
+        
+    # Calcular promedio y desviación
+    promedio_km_dia = sum(d['km_dia'] for d in datos_analisis) / len(datos_analisis)
+    
+    anomalias = []
+    for dato in datos_analisis:
+        desviacion = (dato['km_dia'] - promedio_km_dia) / promedio_km_dia if promedio_km_dia > 0 else 0
+        
+        if abs(desviacion) > umbral_desviacion:
+            anomalias.append({
+                'recarga_id': dato['recarga'].get('id'),
+                'fecha': dato['fecha'],
+                'km_dia': round(dato['km_dia'], 1),
+                'promedio': round(promedio_km_dia, 1),
+                'desviacion_pct': round(desviacion * 100, 0),
+                'tipo': 'alto' if desviacion > 0 else 'bajo'
+            })
+            
+    return anomalias

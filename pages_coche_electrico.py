@@ -7,6 +7,13 @@ import pandas as pd
 import plotly.graph_objects as go
 from database import db_manager
 from utils import coche_electrico
+from utils.plotly_theme import apply_theme_to_fig, create_themed_pie_chart, create_themed_bar_chart, CHART_COLORS_FINANCE
+from utils.feature_flags import is_enabled
+from utils.components.page_layout import render_dashboard_layout, page_section, page_divider
+from utils.components.chart_container import render_chart_container, render_chart_half
+from utils.components.grid_system import render_metric_grid
+from utils.components.data_table import render_data_table
+from utils.design_tokens import Colors, Spacing, Typography
 
 
 def mostrar_coche_electrico():
@@ -111,11 +118,11 @@ def mostrar_registrar_recarga():
             )
 
             km_recorridos = st.number_input(
-                "Km recorridos desde última recarga",
+                "Km recorridos con la batería anterior",
                 min_value=0.0,
                 value=0.0,
                 step=1.0,
-                help="Distancia recorrida con la batería anterior hasta llegar a esta recarga. Opcional."
+                help="Km que has conducido desde la última recarga hasta esta. Se asignarán a la recarga ANTERIOR (la batería que acabas de gastar)."
             )
 
             consumo_medio = st.number_input(
@@ -170,7 +177,15 @@ def mostrar_registrar_recarga():
             elif kwh_cargados <= 0:
                 st.error("❌ Los kWh cargados deben ser positivos")
             else:
-                # Guardar en BD
+                # Si hay km recorridos, asignarlos a la recarga ANTERIOR
+                if km_recorridos > 0 and ultima_recarga:
+                    # Actualizar la última recarga con los km recorridos
+                    db_manager.actualizar_recarga_coche(
+                        ultima_recarga['id'],
+                        km_recorridos=km_recorridos
+                    )
+                
+                # Guardar la nueva recarga en BD (siempre con km = 0)
                 mes = fecha_recarga.month
                 año = fecha_recarga.year
 
@@ -179,7 +194,7 @@ def mostrar_registrar_recarga():
                     bateria_inicial=bateria_inicial,
                     bateria_final=bateria_final,
                     kwh_cargados=kwh_cargados,
-                    km_recorridos=km_recorridos,
+                    km_recorridos=0,  # La nueva recarga empieza sin km
                     consumo_medio=consumo_medio,
                     franja_horaria=franja_horaria,
                     tarifa_kwh=costes['tarifa_kwh'],
@@ -197,7 +212,10 @@ def mostrar_registrar_recarga():
                 )
 
                 if resultado:
-                    st.success(f"✅ Recarga guardada correctamente - Total: {costes['coste_total']:.2f} €")
+                    if km_recorridos > 0 and ultima_recarga:
+                        st.success(f"✅ Recarga guardada - Total: {costes['coste_total']:.2f} € | {km_recorridos:.0f} km asignados a la recarga anterior")
+                    else:
+                        st.success(f"✅ Recarga guardada correctamente - Total: {costes['coste_total']:.2f} €")
                     st.balloons()
 
                     # Mostrar análisis de la recarga
@@ -229,8 +247,8 @@ def mostrar_registrar_recarga():
                            'km_recorridos', 'consumo_medio', 'franja_horaria', 'coste_total']
 
         df_editable = df_recargas[columnas_display].copy()
-        # Convertir fecha a datetime para poder usar DateColumn
-        df_editable['fecha_recarga'] = pd.to_datetime(df_editable['fecha_recarga'])
+        # Convertir fecha a datetime para poder usar DateColumn (formato ISO8601)
+        df_editable['fecha_recarga'] = pd.to_datetime(df_editable['fecha_recarga'], format='ISO8601')
 
         # Renombrar columnas para mejor visualización
         df_editable = df_editable.rename(columns={
@@ -656,8 +674,254 @@ def mostrar_registrar_factura_luz():
         st.info("No hay facturas registradas aún.")
 
 
+def mostrar_estadisticas_coche_v2():
+    """Dashboard con estadísticas y gráficos del coche eléctrico - Versión V2 con nuevo diseño."""
+
+    def render_dashboard_content():
+        # Selector de período
+        col_sel1, col_sel2 = st.columns(2)
+
+        with col_sel1:
+            año_seleccionado = st.selectbox(
+                "Año",
+                options=list(range(datetime.date.today().year, 2019, -1)),
+                index=0
+            )
+
+        with col_sel2:
+            mes_seleccionado = st.selectbox(
+                "Mes (para detalles)",
+                options=list(range(1, 13)),
+                format_func=lambda x: datetime.date(2000, x, 1).strftime('%B'),
+                index=datetime.date.today().month - 1
+            )
+
+        # Obtener datos
+        recargas_mes = db_manager.obtener_recargas(mes=mes_seleccionado, año=año_seleccionado)
+        recargas_año = db_manager.obtener_recargas(año=año_seleccionado)
+
+        if not recargas_mes and not recargas_año:
+            st.warning("No hay datos de recargas para mostrar. Registra tu primera recarga para ver estadísticas.")
+            return
+
+        # === MÉTRICAS DEL MES ===
+        if recargas_mes:
+            stats_mes = coche_electrico.calcular_estadisticas_mes(recargas_mes, incluir_proyeccion=True, detectar_anomalias=True)
+
+            with page_section(
+                title=f"{datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}",
+                icon="📅"
+            ):
+                # Métricas principales
+                metrics = [
+                    {
+                        "label": "Recargas",
+                        "value": stats_mes['total_recargas'],
+                        "help": "Número total de recargas en el mes"
+                    },
+                    {
+                        "label": "kWh Totales",
+                        "value": f"{stats_mes['kwh_totales']:.1f}",
+                        "delta": f"~{stats_mes.get('proyeccion', {}).get('kwh_proyectados', 0):.1f} proyectados" if stats_mes.get('proyeccion', {}).get('kwh_proyectados') else None,
+                        "help": "Energía total cargada"
+                    },
+                    {
+                        "label": "Coste Total",
+                        "value": f"{stats_mes['coste_total']:.2f} €",
+                        "delta": f"~{stats_mes.get('proyeccion', {}).get('coste_proyectado', 0):.2f} € proyectados" if stats_mes.get('proyeccion', {}).get('coste_proyectado') else None,
+                        "help": "Coste total de recargas"
+                    },
+                    {
+                        "label": "Coste/km" if stats_mes['km_totales'] > 0 else "Coste/km (N/A)",
+                        "value": f"{stats_mes['coste_por_km']:.4f} €" if stats_mes['km_totales'] > 0 else "N/A",
+                        "help": "Coste por kilómetro recorrido"
+                    },
+                ]
+
+                render_metric_grid(metrics, cols=4)
+
+                # Métricas secundarias (solo si hay km)
+                if stats_mes['km_totales'] > 0:
+                    st.markdown(f"<div style='height: {Spacing.LG};'></div>", unsafe_allow_html=True)
+
+                    metrics_km = [
+                        {
+                            "label": "Km Recorridos",
+                            "value": f"{stats_mes['km_totales']:.0f}",
+                            "delta": f"~{stats_mes.get('proyeccion', {}).get('km_proyectados', 0):.0f} proyectados" if stats_mes.get('proyeccion', {}).get('km_proyectados') else None,
+                        },
+                        {
+                            "label": "Km/recarga",
+                            "value": f"{stats_mes['km_promedio_por_recarga']:.0f}",
+                        },
+                        {
+                            "label": "Consumo Medio",
+                            "value": f"{stats_mes['consumo_medio']:.1f} kWh/100km",
+                        },
+                        {
+                            "label": "Días entre recargas",
+                            "value": f"{stats_mes['dias_promedio_entre_recargas']:.1f}",
+                        },
+                    ]
+
+                    render_metric_grid(metrics_km, cols=4)
+
+                # Anomalías
+                if stats_mes.get('anomalias'):
+                    anoms = stats_mes['anomalias']
+                    if anoms:
+                        st.warning("⚠️ Se detectaron recargas atípicas:")
+                        for a in anoms:
+                            st.caption(f"Recarga ID {a['recarga_id']} ({a['fecha']}): km/día {a['km_dia']:.1f} (desviación {a['desviacion_pct']:.0f}%)")
+
+            # Comparativa gasolina
+            if stats_mes['km_totales'] > 0:
+                ahorro_vs_gasolina = coche_electrico.calcular_ahorro_vs_gasolina(
+                    stats_mes['km_totales'],
+                    stats_mes['coste_total']
+                )
+
+                with page_section(title="Comparativa con Gasolina", icon="💰"):
+                    metrics_gasolina = [
+                        {
+                            "label": "Coste Gasolina",
+                            "value": f"{ahorro_vs_gasolina['coste_gasolina']:.2f} €",
+                        },
+                        {
+                            "label": "Ahorro Mensual",
+                            "value": f"{ahorro_vs_gasolina['ahorro']:.2f} €",
+                            "delta": f"-{ahorro_vs_gasolina['porcentaje_ahorro']:.1f}%",
+                        },
+                        {
+                            "label": "Ahorro Anual Estimado",
+                            "value": f"{ahorro_vs_gasolina['ahorro'] * 12:.2f} €",
+                        },
+                    ]
+
+                    render_metric_grid(metrics_gasolina, cols=3)
+
+        else:
+            st.info(f"No hay recargas en {datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}")
+
+        # === GRÁFICOS DEL AÑO ===
+        if recargas_año:
+            page_divider(margin=Spacing.XXL)
+
+            with page_section(
+                title=f"Evolución Anual {año_seleccionado}",
+                icon="📈"
+            ):
+                # Preparar datos
+                df_año = pd.DataFrame(recargas_año)
+                df_año['fecha_recarga'] = pd.to_datetime(df_año['fecha_recarga'], format='ISO8601')
+                df_año = df_año.sort_values('fecha_recarga')
+
+                # Gráficos lado a lado
+                fig_kwh = go.Figure()
+                fig_kwh.add_trace(go.Bar(
+                    x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
+                    y=df_año['kwh_cargados'],
+                    name='kWh',
+                    marker_color=CHART_COLORS_FINANCE['balance'],
+                    marker_line=dict(width=0)
+                ))
+                apply_theme_to_fig(fig_kwh, title=None, height=350, showlegend=False)
+
+                fig_coste = go.Figure()
+                fig_coste.add_trace(go.Bar(
+                    x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
+                    y=df_año['coste_total'],
+                    name='Coste €',
+                    marker_color=CHART_COLORS_FINANCE['income'],
+                    marker_line=dict(width=0),
+                    hovertemplate='<b>%{x}</b><br>Coste: %{y:.2f} €<extra></extra>'
+                ))
+                apply_theme_to_fig(fig_coste, title=None, height=350, showlegend=False)
+
+                render_chart_half([
+                    {"fig": fig_kwh, "title": "kWh por Recarga"},
+                    {"fig": fig_coste, "title": "Coste por Recarga"}
+                ])
+
+                # Gráfico de distribución por franja
+                st.markdown(f"<div style='height: {Spacing.LG};'></div>", unsafe_allow_html=True)
+
+                distribucion_franjas = df_año['franja_horaria'].value_counts()
+                df_franjas = pd.DataFrame({
+                    'franja': distribucion_franjas.index,
+                    'recargas': distribucion_franjas.values
+                })
+
+                fig_franjas = create_themed_pie_chart(
+                    df_franjas,
+                    names='franja',
+                    values='recargas',
+                    title='Distribución por Franja Horaria',
+                    hole=0.4
+                )
+
+                render_chart_container(
+                    fig_franjas,
+                    title="Distribución por Franja Horaria",
+                    height=450
+                )
+
+                # Tabla resumen por mes
+                st.markdown(f"<div style='height: {Spacing.XL};'></div>", unsafe_allow_html=True)
+
+                df_año['mes_nombre'] = df_año['fecha_recarga'].dt.strftime('%B')
+
+                resumen_mes = df_año.groupby('mes_nombre').agg({
+                    'kwh_cargados': 'sum',
+                    'km_recorridos': 'sum',
+                    'coste_total': 'sum'
+                }).round(2)
+
+                def calcular_consumo_mes(grupo):
+                    km_total = grupo['km_recorridos'].sum()
+                    kwh_total = grupo['kwh_cargados'].sum()
+                    if km_total > 0:
+                        return round((kwh_total / km_total) * 100, 1)
+                    else:
+                        consumos = grupo['consumo_medio'][grupo['consumo_medio'] > 0]
+                        return round(consumos.mean(), 1) if len(consumos) > 0 else 0
+
+                resumen_consumo = df_año.groupby('mes_nombre').apply(calcular_consumo_mes)
+                resumen_mes['consumo_medio'] = resumen_consumo
+
+                resumen_mes.columns = ['kWh Total', 'Km Total', 'Coste Total €', 'Consumo Medio (kWh/100km)']
+
+                render_data_table(
+                    resumen_mes.reset_index().rename(columns={'mes_nombre': 'Mes'}),
+                    title="Resumen Mensual",
+                    searchable=False,
+                    exportable=True,
+                    export_filename=f"resumen_coche_{año_seleccionado}",
+                    currency_columns=['Coste Total €'],
+                    number_columns=['kWh Total', 'Km Total', 'Consumo Medio (kWh/100km)']
+                )
+
+        else:
+            st.info(f"No hay recargas en {año_seleccionado}")
+
+    # Renderizar con el layout de dashboard
+    render_dashboard_layout(
+        content_fn=render_dashboard_content,
+        title="Coche Eléctrico - VW ID.3 Pro S",
+        description="Estadísticas y análisis de consumo y costes",
+        icon="🔌",
+        show_period_selector=False
+    )
+
+
 def mostrar_estadisticas_coche():
     """Dashboard con estadísticas y gráficos del coche eléctrico."""
+
+    # Feature flag para usar la versión v2
+    if is_enabled('USE_NEW_COCHE_ELECTRICO'):
+        return mostrar_estadisticas_coche_v2()
+
+    # === VERSIÓN LEGACY (V1) ===
     st.subheader("📊 Estadísticas del Coche Eléctrico")
 
     # Selector de período
@@ -688,17 +952,34 @@ def mostrar_estadisticas_coche():
 
     # Estadísticas del mes
     if recargas_mes:
-        stats_mes = coche_electrico.calcular_estadisticas_mes(recargas_mes)
+        stats_mes = coche_electrico.calcular_estadisticas_mes(recargas_mes, incluir_proyeccion=True, detectar_anomalias=True)
 
         st.markdown(f"### 📅 {datetime.date(2000, mes_seleccionado, 1).strftime('%B')} {año_seleccionado}")
 
         # Layout responsive (2x2 con 2 métricas por columna)
         col1, col2 = st.columns(2)
 
+        # Obtener proyección si existe
+        proj = stats_mes.get('proyeccion', {})
+
         with col1:
             st.metric("Recargas", stats_mes['total_recargas'])
-            st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}")
-            st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
+            
+            # kWh con proyección
+            if proj and proj.get('kwh_proyectados'):
+                st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}",
+                         delta=f"~{proj['kwh_proyectados']:.1f} proyectados",
+                         help="Proyección para fin de mes")
+            else:
+                st.metric("kWh Totales", f"{stats_mes['kwh_totales']:.1f}")
+            
+            # Coste con proyección
+            if proj and proj.get('coste_proyectado'):
+                st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €",
+                         delta=f"~{proj['coste_proyectado']:.2f} € proyectados",
+                         help="Proyección para fin de mes")
+            else:
+                st.metric("Coste Total", f"{stats_mes['coste_total']:.2f} €")
 
             # Mostrar coste/km solo si hay km registrados
             if stats_mes['km_totales'] > 0:
@@ -709,7 +990,13 @@ def mostrar_estadisticas_coche():
         with col2:
             # Mostrar km solo si hay registros de km
             if stats_mes['km_totales'] > 0:
-                st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
+                # Km con proyección
+                if proj and proj.get('km_proyectados'):
+                    st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}",
+                             delta=f"~{proj['km_proyectados']:.0f} proyectados",
+                             help="Proyección para fin de mes")
+                else:
+                    st.metric("Km Recorridos", f"{stats_mes['km_totales']:.0f}")
                 st.metric("Km/recarga", f"{stats_mes['km_promedio_por_recarga']:.0f}")
             else:
                 st.metric("Km Recorridos", "No registrados", help="Opcional: Registra km desde la carga anterior")
@@ -717,6 +1004,14 @@ def mostrar_estadisticas_coche():
 
             st.metric("Consumo Medio", f"{stats_mes['consumo_medio']:.1f} kWh/100km")
             st.metric("Días entre recargas", f"{stats_mes['dias_promedio_entre_recargas']:.1f}")
+
+            # Anomalías
+            if stats_mes.get('anomalias'):
+                anoms = stats_mes['anomalias']
+                if anoms:
+                    st.warning("⚠️ Se detectaron recargas atípicas:")
+                    for a in anoms:
+                        st.caption(f"Recarga ID {a['recarga_id']} ({a['fecha']}): km/día {a['km_dia']:.1f} (desviación {a['desviacion_pct']:.0f}%)")
 
         # Comparativa gasolina
         if stats_mes['km_totales'] > 0:
@@ -751,7 +1046,7 @@ def mostrar_estadisticas_coche():
 
         # Preparar datos para gráficos
         df_año = pd.DataFrame(recargas_año)
-        df_año['fecha_recarga'] = pd.to_datetime(df_año['fecha_recarga'])
+        df_año['fecha_recarga'] = pd.to_datetime(df_año['fecha_recarga'], format='ISO8601')
         df_año = df_año.sort_values('fecha_recarga')
 
         # Gráfico 1: Evolución kWh y Coste
@@ -764,9 +1059,10 @@ def mostrar_estadisticas_coche():
                 x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
                 y=df_año['kwh_cargados'],
                 name='kWh',
-                marker_color='lightblue'
+                marker_color=CHART_COLORS_FINANCE['balance'],
+                marker_line=dict(width=0)
             ))
-            fig_kwh.update_layout(height=300, showlegend=False)
+            apply_theme_to_fig(fig_kwh, title=None, height=300, showlegend=False)
             st.plotly_chart(fig_kwh, use_container_width=True)
 
         with col_g2:
@@ -776,21 +1072,30 @@ def mostrar_estadisticas_coche():
                 x=df_año['fecha_recarga'].dt.strftime('%d/%m'),
                 y=df_año['coste_total'],
                 name='Coste €',
-                marker_color='lightgreen'
+                marker_color=CHART_COLORS_FINANCE['income'],
+                marker_line=dict(width=0),
+                hovertemplate='<b>%{x}</b><br>Coste: %{y:.2f} €<extra></extra>'
             ))
-            fig_coste.update_layout(height=300, showlegend=False)
+            apply_theme_to_fig(fig_coste, title=None, height=300, showlegend=False)
             st.plotly_chart(fig_coste, use_container_width=True)
 
         # Gráfico 2: Distribución por franja
         st.markdown("#### Distribución por Franja Horaria")
         distribucion_franjas = df_año['franja_horaria'].value_counts()
 
-        fig_franjas = go.Figure(data=[go.Pie(
-            labels=distribucion_franjas.index,
-            values=distribucion_franjas.values,
-            hole=.3
-        )])
-        fig_franjas.update_layout(height=400)
+        # Crear DataFrame para el gráfico de pie
+        df_franjas = pd.DataFrame({
+            'franja': distribucion_franjas.index,
+            'recargas': distribucion_franjas.values
+        })
+
+        fig_franjas = create_themed_pie_chart(
+            df_franjas,
+            names='franja',
+            values='recargas',
+            title='Distribución por Franja Horaria',
+            hole=0.4
+        )
         st.plotly_chart(fig_franjas, use_container_width=True)
 
         # Tabla resumen por mes
