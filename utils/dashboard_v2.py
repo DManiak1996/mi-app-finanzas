@@ -542,12 +542,186 @@ def _render_analisis_avanzado(mes, año, vista_periodo, NOMBRES_MESES):
 
             st.markdown("---")
 
-            # Resto del código del análisis avanzado (mantener igual que v1)
-            # ... (por brevedad, mantener el código existente)
+            # Métricas en expanders organizados
+            with st.expander("💰 Ahorro y Proyecciones", expanded=True):
+                col1, col2, col3 = st.columns(3)
+
+                tasa_ahorro = metrics.calcular_tasa_ahorro(mes, año)
+                col1.metric(
+                    "Tasa de Ahorro",
+                    f"{tasa_ahorro['tasa_ahorro']:.1f}%",
+                    delta=f"{tasa_ahorro['ahorro_absoluto']:.0f} €",
+                    help="% de tus ingresos que lograste ahorrar. Ideal >20%. Útil para evaluar tu disciplina financiera"
+                )
+
+                gasto_diario = metrics.calcular_gasto_promedio_diario(mes, año)
+                col2.metric(
+                    "Gasto Promedio/Día",
+                    f"{gasto_diario['promedio_diario']:.2f} €",
+                    delta=f"Proyección mes: {gasto_diario['proyeccion_mes']:.0f} €",
+                    help="Cuánto gastas en promedio cada día. Te ayuda a controlar tus gastos diarios y proyectar el total del mes"
+                )
+
+                proyeccion = metrics.calcular_proyeccion_balance(3)
+                col3.metric(
+                    "Balance en 3 Meses",
+                    f"{proyeccion['balance_proyectado']:.0f} €",
+                    delta=f"Confianza: {proyeccion['confianza']}",
+                    help="Proyección de tu balance en 3 meses basado en tu comportamiento histórico. Útil para planificar gastos futuros"
+                )
+
+            with st.expander("📊 Efficiency Ratios"):
+                ratios = metrics.calcular_efficiency_ratios(mes, año)
+                st.info(f"**{ratios['evaluacion']}**")
+
+                col1, col2, col3 = st.columns(3)
+                col1.metric(
+                    "FIJOS/Ingresos",
+                    f"{ratios.get('ratio_fijos', 0):.1f}%",
+                    delta="Ideal <30%",
+                    help="% de gastos fijos sobre tus ingresos. Ideal <30%. Mide qué porción de tus ingresos va a gastos obligatorios (vivienda, servicios, etc.)"
+                )
+                col2.metric(
+                    "DISFRUTE/Ingresos",
+                    f"{ratios.get('ratio_disfrute', 0):.1f}%",
+                    delta="Ideal <30%",
+                    help="% de gastos de disfrute sobre tus ingresos. Ideal <30%. Mide cuánto destinas a ocio, entretenimiento y placeres personales"
+                )
+                col3.metric(
+                    "EXTRA/Ingresos",
+                    f"{ratios.get('ratio_extraordinarios', 0):.1f}%",
+                    delta="Ideal <10%",
+                    help="% de gastos extraordinarios sobre tus ingresos. Ideal <10%. Gastos imprevistos o no recurrentes que afectan tu presupuesto"
+                )
+
+            with st.expander("📉 Variación vs Mes Anterior"):
+                variacion = metrics.calcular_variacion_mensual(mes, año)
+
+                if variacion['gastos_anterior'] > 0:
+                    delta = variacion['variacion_total']
+                    if delta < 0:
+                        st.success(f"✅ **{abs(delta):.1f}% menos** que el mes pasado")
+                    elif delta > 0:
+                        st.warning(f"⚠️ **{delta:.1f}% más** que el mes pasado")
+                    else:
+                        st.info("➡️ Gastos similares")
+
+                    col1, col2 = st.columns(2)
+                    col1.metric("Mes Actual", f"{variacion['gastos_actual']:.2f} €")
+                    col2.metric("Mes Anterior", f"{variacion['gastos_anterior']:.2f} €")
+
+                    # Por categoría
+                    for cat, datos in variacion['por_categoria'].items():
+                        if datos['variacion'] != 0:
+                            icono = "📈" if datos['variacion'] > 0 else "📉"
+                            st.caption(f"{icono} **{cat}**: {datos['variacion']:+.1f}%")
+                else:
+                    st.info("Sin datos del mes anterior")
+
+            with st.expander("🔝 Top 10 Gastos"):
+                top = metrics.calcular_top_gastos(mes, año, 10)
+                if top:
+                    df = pd.DataFrame(top)
+                    st.dataframe(
+                        df,
+                        column_config={
+                            "importe": st.column_config.NumberColumn(format="%.2f €")
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+                else:
+                    st.info("No hay gastos registrados")
 
     else:  # Vista anual
         st.subheader("📅 Métricas Anuales Avanzadas")
-        # ... (mantener código v1)
+
+        with st.spinner("Calculando métricas anuales..."):
+            datos_anuales = metrics.calcular_totales_anual(año)
+
+            if datos_anuales:
+                # Calcular métricas anuales
+                ahorro_anual = datos_anuales['balance_neto']
+                ingresos_anuales = datos_anuales['total_ingresos']
+                gastos_anuales_netos = abs(datos_anuales['gastos_netos'])
+
+                tasa_ahorro_anual = (ahorro_anual / ingresos_anuales * 100) if ingresos_anuales > 0 else 0
+                promedio_gasto_mensual = gastos_anuales_netos / 12
+                promedio_ingreso_mensual = ingresos_anuales / 12
+
+                # Grid de 3 métricas principales usando el nuevo sistema
+                annual_metrics = [
+                    {
+                        "title": "Ahorro Anual Total",
+                        "value": ahorro_anual,
+                        "delta": f"Tasa: {tasa_ahorro_anual:.1f}%",
+                        "icon": "💰",
+                        "color": "success" if ahorro_anual > 0 else "warning",
+                        "format_type": "currency",
+                        "help_text": "Total ahorrado en el año completo. La tasa muestra qué % de tus ingresos anuales has logrado ahorrar"
+                    },
+                    {
+                        "title": "Promedio Gasto Neto/Mes",
+                        "value": promedio_gasto_mensual,
+                        "icon": "📊",
+                        "color": "info",
+                        "format_type": "currency",
+                        "help_text": "Gasto neto promedio mensual del año (después de reembolsos). Útil para establecer un presupuesto mensual realista"
+                    },
+                    {
+                        "title": "Promedio Ingreso/Mes",
+                        "value": promedio_ingreso_mensual,
+                        "icon": "💵",
+                        "color": "success",
+                        "format_type": "currency",
+                        "help_text": "Ingreso promedio mensual del año. Te ayuda a entender tu capacidad financiera mensual típica"
+                    }
+                ]
+
+                render_metric_grid(annual_metrics, columns_desktop=3)
+
+                st.markdown("---")
+
+                # Mejor y peor mes
+                evol = datos_anuales['evolucion_mensual']
+                if not evol.empty and 'balance' in evol.columns:
+                    mejor_mes_idx = evol['balance'].idxmax()
+                    peor_mes_idx = evol['balance'].idxmin()
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.success(f"🌟 **Mejor Mes:** {NOMBRES_MESES.get(mejor_mes_idx + 1, 'N/A')}")
+                        st.write(f"Balance: {evol.loc[mejor_mes_idx, 'balance']:.2f} €")
+
+                    with col2:
+                        st.error(f"⚠️ **Peor Mes:** {NOMBRES_MESES.get(peor_mes_idx + 1, 'N/A')}")
+                        st.write(f"Balance: {evol.loc[peor_mes_idx, 'balance']:.2f} €")
+
+                st.markdown("---")
+
+                # Distribución anual por categoría
+                st.markdown("### 📊 Distribución Anual Detallada")
+
+                gastos_cat = datos_anuales['gastos_por_categoria']
+                if gastos_cat:
+                    df_cat = pd.DataFrame(list(gastos_cat.items()), columns=['Categoría', 'Total'])
+                    df_cat['Total'] = df_cat['Total'].abs()
+                    df_cat['%'] = (df_cat['Total'] / df_cat['Total'].sum() * 100).round(1)
+                    df_cat['Promedio/Mes'] = (df_cat['Total'] / 12).round(2)
+
+                    st.dataframe(
+                        df_cat,
+                        column_config={
+                            "Total": st.column_config.NumberColumn(format="%.2f €"),
+                            "%": st.column_config.NumberColumn(format="%.1f%%"),
+                            "Promedio/Mes": st.column_config.NumberColumn(format="%.2f €")
+                        },
+                        hide_index=True,
+                        use_container_width=True
+                    )
+            else:
+                st.info(f"No hay datos para el año {año}")
 
 
 def _render_historico(año):
