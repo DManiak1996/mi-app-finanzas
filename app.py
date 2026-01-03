@@ -1285,15 +1285,15 @@ def mostrar_transacciones_v1():
             # Selector de columnas a mostrar
             with st.expander("🔧 Configurar columnas visibles"):
                 todas_columnas = list(df_filtrado.columns)
-                # Columnas ocultas por defecto
-                columnas_ocultas_default = ['id', 'mes', 'año', 'created_at', 'updated_at']
+                # Columnas ocultas por defecto (ID ahora se muestra para poder editar)
+                columnas_ocultas_default = ['mes', 'año', 'created_at', 'updated_at']
                 columnas_visibles_default = [col for col in todas_columnas if col not in columnas_ocultas_default]
 
                 columnas_seleccionadas = st.multiselect(
                     "Selecciona las columnas a mostrar:",
                     options=todas_columnas,
                     default=columnas_visibles_default,
-                    help="Elige qué columnas quieres ver en la tabla"
+                    help="Elige qué columnas quieres ver en la tabla. La columna ID es necesaria para editar transacciones."
                 )
 
             # Filtrar dataframe según columnas seleccionadas
@@ -1566,14 +1566,16 @@ def mostrar_transacciones_v2():
                     # Selector de columnas visibles
                     with st.expander("🔧 Configurar columnas visibles"):
                         todas_columnas = list(df_filtrado.columns)
-                        columnas_ocultas_default = ['id', 'mes', 'año', 'created_at', 'updated_at']
+                        # ID ahora visible por defecto para permitir edición
+                        columnas_ocultas_default = ['mes', 'año', 'created_at', 'updated_at']
                         columnas_visibles_default = [col for col in todas_columnas if col not in columnas_ocultas_default]
 
                         columnas_seleccionadas = st.multiselect(
                             "Columnas a mostrar:",
                             options=todas_columnas,
                             default=columnas_visibles_default,
-                            key="trans_v2_columnas"
+                            key="trans_v2_columnas",
+                            help="La columna ID es necesaria para guardar cambios en las transacciones."
                         )
 
                     # Filtrar columnas
